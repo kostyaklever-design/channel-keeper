@@ -7,13 +7,11 @@ from telegram import Update
 from telegram.ext import ContextTypes
 
 from .hygiene import news_streak
+from .i18n import tr
+from .notify import CLEANUP
 from .runtime import ai, cfg, notify_admins, settings, state
 
 WEEK = 7 * 86400
-CLEANUP = (('warn', 'warnings'), ('ban', 'bans'), ('manual_ban', 'bans by admins'), ('captcha_kicked', 'removed by captcha'),
-           ('flood', 'muted for flood'), ('first_minutes', 'held in fresh posts'), ('ai_flag', 'flagged by AI'),
-           ('profile_flag', 'flagged for the profile'), ('learned_flag', 'flagged by the learning filter'),
-           ('review_deleted', 'deleted after your review'), ('ai_deleted', 'deleted after your review (before 1.8.6)'))
 
 
 def report_text(now: float | None = None) -> str:
@@ -24,30 +22,32 @@ def report_text(now: float | None = None) -> str:
     by_label = dict(posts)
     own, news = by_label.get('own', 0), by_label.get('news', 0)
     kinds = dict(state.db.execute('SELECT kind, COUNT(*) FROM actions WHERE at>=? GROUP BY kind', (since,)).fetchall())
-    lines = ['📊 Channel week', '',
-             f'Posts: {own + news} — {own} yours, {news} news from others']
+    lines = [tr('📊 Channel week'), '',
+             tr('Posts: {total} — {own} yours, {news} news from others', total=own + news, own=own, news=news)]
     rules = settings().rules
     if news and rules.news_in_a_row:
-        ratio = 'balanced' if news <= rules.news_in_a_row * max(own, 1) else 'too many others\' news — post something of your own'
-        lines.append(f'Rule 1 : {rules.news_in_a_row}: {ratio}')
+        ratio = (tr('balanced') if news <= rules.news_in_a_row * max(own, 1)
+                 else tr("too many others' news — post something of your own"))
+        lines.append(tr('Rule 1 : {n}: {ratio}', n=rules.news_in_a_row, ratio=ratio))
     streak = news_streak(state.history())
     if streak >= rules.news_in_a_row > 0:
-        lines.append(f'Right now {streak} news in a row: the next news waits for your post')
-    cleaned = [f'• {label}: {kinds[k]}' for k, label in CLEANUP if kinds.get(k)]
-    lines += ['', 'Cleaned up:'] + (cleaned or ['• nothing — a quiet week'])
+        lines.append(tr('Right now {n} news in a row: the next news waits for your post', n=streak))
+    cleaned = [f'• {tr(label)}: {kinds[k]}' for k, label in CLEANUP if kinds.get(k)]
+    lines += ['', tr('Cleaned up:')] + (cleaned or [tr('• nothing — a quiet week')])
     from .inbox import summary
     if summary():
         lines += ['', summary()]
     waiting = state.drafts_in('pending')
     if waiting:
-        lines += ['', f'Drafts waiting for you: {len(waiting)} (/drafts)']
+        lines += ['', tr('Drafts waiting for you: {n} (/drafts)', n=len(waiting))]
     if settings().learning_filter:
         from .review import model
-        lines += ['', f'Learning filter: {model().progress()}']
+        lines += ['', tr('Learning filter: {state}', state=model().progress())]
     if ai.c.on:
         calls, tokens = ai.usage()
         spaced = f'{tokens:,}'.replace(',', ' ')
-        lines += ['', f'AI this month: {calls} of {ai.c.monthly_limit} requests, {spaced} tokens']
+        lines += ['', tr('AI this month: {calls} of {limit} requests, {tokens} tokens', calls=calls,
+                         limit=ai.c.monthly_limit, tokens=spaced)]
     return '\n'.join(lines)
 
 

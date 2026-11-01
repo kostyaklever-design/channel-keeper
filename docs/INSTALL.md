@@ -7,6 +7,11 @@ Three ways; each needs only the bot token from @BotFather. After any of them: ma
 ## Railway
 No server of your own, everything in the browser. Railway is paid by usage; see railway.com/pricing.
 
+**In one click:** [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/channel-keeper) → sign in → paste the token into `BOT_TOKEN` → **Deploy**. Railway creates the project and the `/data` volume by itself. Then go on with [the steps below](#after-any-way-admin-rights-setup-commands).
+The bot then uses its default settings, in its language (English or Russian, from your Telegram). To change them (spam words, the bot's words in the chat, Russian texts from `examples/keeper.ru.yaml`), keep `keeper.yaml` in a small private repository of your own and point `CONTENT_REPO` to it ([CONFIG](CONFIG.md#content-in-a-separate-private-repository-optional)).
+
+**By hand**, if you want your own copy of the code (to edit `posts.yaml` and `keeper.yaml` on GitHub):
+
 **1. Your own copy of the code on GitHub** — private, because `posts.yaml` is your content plan.
 - On this repository's page press **Use this template → Create a new repository**, pick **Private**, **Create repository**.
 - No such button? Download the archive from **Releases**, then GitHub → **New repository** → **Private** → **Create** → **uploading an existing file** → drag in everything from the archive → **Commit changes**.
@@ -62,28 +67,14 @@ Optional, only if you use these features:
 
 **4. `/setup`.** Open the bot in a private chat → **Start** → `/setup`. The first person to do it becomes the owner. Press your channel, then your group: the bot checks its rights and lists what is missing. Send `/setup` again any time to re-check.
 
-**5. The command menu (optional, 1 minute).** @BotFather → `/setcommands` → your bot → send this:
-```
-setup - pick the channel and group, check rights
-queue - what goes out and when
-drafts - drafts waiting for you
-sources - feeds and their last check
-report - the channel's week
-log - what the bot did
-ai - drafts from the AI (needs a key)
-forget - delete everything about a person
-ban - in the group: reply to a message to ban its author
-unban - in the group: lift a ban
-id - chat id and your user id
-version - which version is running
-```
+**5. Language and the command menu.** Nothing to do: the bot sets its «Menu» button itself and speaks Russian when your Telegram is in Russian, English otherwise. Change it with `/lang ru`, `/lang en` or `/lang auto`.
 
 **First post:** send the bot any text in the private chat → **✅ Publish now**.
 
 **Next, if you want:**
 - your settings and the bot's words in the chat — `keeper.yaml` ([SETTINGS](SETTINGS.md)); a Russian-language example is in `examples/keeper.ru.yaml`;
 - your YouTube, blog and news — `sources.yaml` ([SOURCES](SOURCES.md));
-- the AI — one variable `AI_API_KEY` ([AI](AI.md)).
+- the AI — `/setup` → **🔑 Add AI key**, paste your OpenAI or Anthropic key ([AI](AI.md)).
 
 ## Something is wrong
 | You see | Do |

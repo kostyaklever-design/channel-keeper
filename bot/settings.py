@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import yaml
 
+from .i18n import current, tr
 from .hygiene import Rules, parse_rules
 
 DEFAULT_SPAM_WORDS = (
@@ -28,7 +29,7 @@ DEFAULT_MESSAGES = {
 
 KNOWN_KEYS = {'timezone', 'spam_words', 'warn_seconds', 'messages', 'channel_rules', 'captcha', 'channel_messages',
               'flood', 'first_minutes', 'keep_days', 'ai_moderation', 'probation', 'profile_check', 'ad_label',
-              'join_requests', 'learning_filter', 'read_more', 'ai_language'}
+              'join_requests', 'learning_filter', 'read_more', 'ai_language', 'language'}
 # Messages written «on behalf of a channel» (not the own channel): a favourite trick of spammers,
 # because a channel cannot press a captcha button and has no personal account to ban.
 CHANNEL_MESSAGES = ('block', 'check')
@@ -44,10 +45,15 @@ class Captcha:
     text: str = DEFAULT_CAPTCHA_TEXT
     button: str = "I'm human"
 
+    def label(self, lang: str | None = None) -> str:
+        """The button's words: your own from keeper.yaml, or the default in the bot's language."""
+        return tr("I'm human", lang) if self.button == "I'm human" else self.button
+
     def html(self, user_id: int, display: str) -> str:
         """The captcha message, {name} as a mention that notifies the person."""
         mark = '\x00NAME\x00'
-        safe = html.escape(self.text.format(name=mark, seconds=self.seconds), quote=False)
+        text = tr(DEFAULT_CAPTCHA_TEXT) if self.text == DEFAULT_CAPTCHA_TEXT else self.text
+        safe = html.escape(text.format(name=mark, seconds=self.seconds), quote=False)
         link = f'<a href="tg://user?id={int(user_id)}">{html.escape(display, quote=False)}</a>'
         return safe.replace(html.escape(mark, quote=False), link)
 
@@ -156,13 +162,30 @@ class Settings:
     learning_filter: bool = True      # learns from your Delete / Keep; only asks you, never deletes
     read_more: str = 'Read on {source} →'   # the short link under a news post from a feed
     ai_language: str = 'English'      # the language the AI writes retellings in
+    language: str = ''                # the bot's own language for the owners: '' = each owner's Telegram language
 
     @property
     def tz(self) -> ZoneInfo:
         return ZoneInfo(self.timezone)
 
     def text(self, key: str, **values) -> str:
-        return (self.messages.get(key) or DEFAULT_MESSAGES[key]).format(**values)
+        """What the bot says in the chat: your words from keeper.yaml, or the default in the bot's language."""
+        value = self.messages.get(key) or DEFAULT_MESSAGES[key]
+        if value == DEFAULT_MESSAGES[key]:
+            value = tr(value)
+        return value.format(**values)
+
+    # Defaults that the channel's readers see follow the bot's language too; your own values stay as written.
+    def ad_text(self) -> str:
+        return tr('Advertisement') if self.ad_label == 'Advertisement' else self.ad_label
+
+    def read_more_text(self) -> str:
+        return tr('Read on {source} →') if self.read_more == 'Read on {source} →' else self.read_more
+
+    def ai_language_name(self) -> str:
+        if self.ai_language == 'English' and current() == 'ru':
+            return 'Russian'
+        return self.ai_language
 
     def html(self, key: str, user_id: int, display: str) -> str:
         """The message as Telegram HTML, {name} as a mention linked to the account by id.
@@ -189,6 +212,18 @@ def _language(raw: dict) -> str:
     value = str(raw.get('ai_language') or 'English').strip()
     if not 2 <= len(value) <= 30:
         raise ValueError('keeper.yaml: ai_language must be a language name like Russian or English')
+    return value
+
+
+LANGUAGES = ('en', 'ru')
+
+
+def _bot_language(raw: dict) -> str:
+    value = str(raw.get('language') or 'auto').strip().lower()
+    if value == 'auto':
+        return ''
+    if value not in LANGUAGES:
+        raise ValueError('keeper.yaml: language must be auto, en or ru')
     return value
 
 
@@ -267,4 +302,4 @@ def parse_settings(text: str | None) -> Settings:
     return Settings(tz, words, warn_seconds, msgs, parse_rules(raw.get('channel_rules')),
                     parse_captcha(raw.get('captcha')), channel_messages, parse_flood(raw.get('flood')), first, keep,
                     ai_mod, parse_probation(raw.get('probation')), profile, ad_label, joins,
-                    _bool(raw, 'learning_filter', True), _read_more(raw), _language(raw))
+                    _bool(raw, 'learning_filter', True), _read_more(raw), _language(raw), _bot_language(raw))

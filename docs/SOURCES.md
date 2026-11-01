@@ -1,5 +1,7 @@
 # Feeds — sources.yaml
 
+[Русская версия](SOURCES.ru.md)
+
 The bot checks your feeds every 15 minutes and brings new entries into the channel: your YouTube videos and blog posts, news by a search query, Google Alerts, any RSS or Atom feed.
 The file is optional. Edit it on GitHub (pencil icon) → **Commit**; the bot applies changes within 5 minutes. A mistake keeps the previous sources and turns the GitHub check red.
 
@@ -48,7 +50,7 @@ sources:
 
 ## Pictures and retelling
 - If the feed gives a picture for an entry (YouTube thumbnails, most blogs, Habr), the post goes with it. If Telegram cannot fetch the picture, the post goes as text.
-- On a news draft, **✨ Retell in my channel's words** (needs `AI_API_KEY`): the AI reads the article and writes 2–3 sentences in its own words in `ai_language`; the post becomes title + retelling + «Read on …», and you get a new preview. Unique text, nothing copied. Google News gives only a headline in its feed: there the AI writes from the headline — what the source reports (attributed to it), general background and why it matters — and is told not to invent details of the event. The preview warns you to check it before publishing.
+- On a news draft, **✨ Retell in my channel's words** (needs an AI key): the AI reads the article and writes 2–3 sentences in its own words in `ai_language` (by default the bot's language); the post becomes title + retelling + «Read on …», and you get a new preview. Unique text, nothing copied. Google News gives only a headline in its feed: there the AI writes from the headline — what the source reports (attributed to it), general background and why it matters — and is told not to invent details of the event. The preview warns you to check it before publishing.
 
 ## What the bot promises
 - **Nothing old is dumped into the channel.** When a source is new — or its address changes — everything already in its feed is marked as seen. Only entries that appear after that come.

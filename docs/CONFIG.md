@@ -1,5 +1,7 @@
 # Environment variables (Railway → service → Variables)
 
+[Русская версия](CONFIG.ru.md)
+
 Only `BOT_TOKEN` is required: the channel, the group and the owners can be chosen in Telegram with `/setup`. If you set them here, the variables win. Everything else — timezone, spam words, the bot's words in chat — is in [keeper.yaml](SETTINGS.md).
 Every variable the bot reads is listed below; the guard `tests/test_docs.py` checks this table against the code.
 
@@ -13,7 +15,7 @@ Every variable the bot reads is listed below; the guard `tests/test_docs.py` che
 | `CONTENT_REPO` | no | Private GitHub repository with `posts.yaml`, `keeper.yaml` and images. Empty — files from this repository | `yourname/channel-content` |
 | `CONTENT_TOKEN` | with `CONTENT_REPO` | Fine-grained GitHub token: only that repository, only **Contents: Read** | `github_pat_...` |
 | `CONTENT_BRANCH` | no | Branch of the content repository. Default `main` | `main` |
-| `AI_API_KEY` | no | Your key from Anthropic or OpenAI. Empty — no AI, the bot works as before. See [AI](AI.md) | `sk-ant-...` |
+| `AI_API_KEY` | no | Your key from Anthropic or OpenAI. Empty — no AI, or a key added in Telegram with `/setup` → 🔑 Add AI key. See [AI](AI.md) | `sk-ant-...` |
 | `AI_PROVIDER` | no | `anthropic` or `openai`. Empty — told by the key (`sk-ant-…` = anthropic) | `openai` |
 | `AI_MODEL` | no | Model name. Default: `claude-haiku-5-5` (anthropic), `gpt-5-nano` (openai) | `gpt-5-nano` |
 | `AI_MONTHLY_LIMIT` | no | At most this many AI requests per calendar month (default 300) — protects your bill | `300` |

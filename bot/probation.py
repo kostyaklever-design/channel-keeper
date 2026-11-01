@@ -8,6 +8,7 @@ Profile check: on a newcomer's first message the bot looks at their profile desc
 a spam word there is the signature of AI-written «neurocomments» (clean text, the ad sits in the
 profile). The bot never bans for it: the message stays and the owners decide.
 """
+from .i18n import tr
 from .moderation import spam_reason
 from .runtime import log, settings, state
 
@@ -17,16 +18,16 @@ TOLD = 'told_probation'      # bot_data: user ids already told about probation
 def risky(msg) -> str | None:
     """What in this message is not allowed during probation, or None."""
     if getattr(msg, 'forward_origin', None):
-        return 'a forward'
+        return tr('a forward')
     if getattr(msg, 'contact', None):
-        return 'a contact'
+        return tr('a contact')
     if getattr(msg, 'story', None):
-        return 'a story'
+        return tr('a story')
     if getattr(msg, 'via_bot', None) or getattr(msg, 'reply_markup', None):
-        return 'a message with buttons'
+        return tr('a message with buttons')
     media = any(getattr(msg, kind, None) for kind in ('photo', 'video', 'animation', 'document', 'video_note'))
     if media and not (getattr(msg, 'caption', None) or '').strip():
-        return 'a picture or video without words'
+        return tr('a picture or video without words')
     return None
 
 
@@ -49,7 +50,7 @@ async def check(ctx, msg, user_id: int, name: str, say) -> bool:
             captioned.clear()
         captioned[group] = True       # only the first part of an album carries the words
     what = risky(msg)
-    if what == 'a picture or video without words' and group in captioned:
+    if what == tr('a picture or video without words') and group in captioned:
         what = None
     if not what or not on_probation(user_id):
         return False
@@ -63,14 +64,14 @@ async def check(ctx, msg, user_id: int, name: str, say) -> bool:
     if user_id not in told:
         told.add(user_id)
         await say(ctx, 'probation', user_id, name, msg)
-    state.log_action('probation', user_id, name, f'{what} before {settings().probation.messages} messages',
+    state.log_action('probation', user_id, name, tr('{what} before {n} messages', what=what, n=settings().probation.messages),
                      msg.caption or '')
     return True
 
 
 def profile_reason(bio: str, spam_words) -> str | None:
     reason = spam_reason(bio or '', [], spam_words, False)
-    return f'{reason} in the profile' if reason else None
+    return tr('{reason} in the profile', reason=reason) if reason else None
 
 
 async def profile_problem(ctx, user_id: int) -> str | None:

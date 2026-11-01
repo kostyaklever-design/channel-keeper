@@ -1,5 +1,7 @@
 # Moderation of the discussion group
 
+[Русская версия](MODERATION.ru.md)
+
 The bot checks every new message in the group. Admins and the channel's own posts are never checked.
 
 ## What counts as a violation
@@ -27,7 +29,7 @@ A message later edited into a link or a spam word is treated like a new one: del
 The bot learns what spam looks like **in your group**: from every **Delete / Keep** you press on a review, and from the start of messages the rules removed (as kept in `/log`). Once it has at least 20 examples of each kind, a newcomer's message that looks like what you deleted before (90%+) comes to you with **Delete / Keep** — it is never deleted by the filter itself. Each verdict teaches it right away. `/report` shows how far it is (`learning — 12/20 spam, 3/20 kept`). Ordinary chat messages are never stored, so «Keep» examples come only from your reviews — it learns slowly, and that is on purpose. Turn off with `learning_filter: false`.
 
 ## Owners' verdicts
-Every **Delete / Keep** on a review (profile check or AI) is kept on your server with the message text — the material for a spam filter that learns from your own choices in a later version. Nothing leaves the server; `/forget` deletes a person's verdicts too.
+Every **Delete / Keep** on a review (profile check, AI or the learning filter) is kept on your server with the message text — the learning filter learns from them. Nothing leaves the server; `/forget` deletes a person's verdicts too.
 
 ## Flood
 `flood.messages` messages within `flood.seconds` (5 in 10 seconds by default) — the last message is deleted and the person can only read for `flood.mute_minutes` (10). An album of photos counts as one message. Admins are never limited. It shows in `/log` and comes to admins as a quiet notification.

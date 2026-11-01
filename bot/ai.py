@@ -13,6 +13,7 @@ import time
 import httpx
 
 from .config import AIConfig
+from .i18n import tr
 
 PROVIDERS = {
     'anthropic': ('https://api.anthropic.com/v1/messages', 'claude-haiku-5-5'),
@@ -31,8 +32,21 @@ def month() -> str:
 class AI:
     """ask() -> text. Counts requests and tokens per month in the bot's memory (kv table)."""
 
+    KEY = 'ai_key'          # kv: a key the owner added in Telegram (/setup); AI_API_KEY always wins
+
     def __init__(self, config: AIConfig, state, transport=None):
-        self.c, self.state, self.transport = config, state, transport
+        self.base, self.state, self.transport = config, state, transport
+
+    @property
+    def c(self) -> AIConfig:
+        if self.base.key or self.state is None:
+            return self.base
+        stored = self.state.get(self.KEY) or ''
+        return self.base.with_key(stored) if stored else self.base
+
+    @property
+    def key_from_env(self) -> bool:
+        return bool(self.base.key)
 
     def usage(self) -> tuple[int, int]:
         raw = self.state.get(f'ai:{month()}') or '0,0'
@@ -43,34 +57,38 @@ class AI:
         calls, total = self.usage()
         self.state.put(f'ai:{month()}', f'{calls + calls_added},{total + tokens}')
 
-    async def ask(self, system: str, user: str, max_tokens: int = 800, timeout: float = 60) -> str:
-        if not self.c.on:
-            raise AIError('AI is off. Add AI_API_KEY (and AI_PROVIDER, AI_MODEL if needed) to the server variables.')
+    async def ask(self, system: str, user: str, max_tokens: int = 800, timeout: float = 60,
+                  config: AIConfig | None = None) -> str:
+        c = config or self.c          # read once: a key added in Telegram lives in the bot's memory
+        if not c.on:
+            raise AIError(tr('AI is off. Add your OpenAI or Anthropic key: /setup → 🔑 Add AI key '
+                             '(or AI_API_KEY in the server variables).'))
         calls, _ = self.usage()
-        if calls >= self.c.monthly_limit:
-            raise AIError(f'The monthly AI limit ({self.c.monthly_limit} requests) is reached. '
-                          f'Raise AI_MONTHLY_LIMIT or wait for the next month.')
+        if calls >= c.monthly_limit:
+            raise AIError(tr('The monthly AI limit ({n} requests) is reached. '
+                             'Raise AI_MONTHLY_LIMIT or wait for the next month.', n=c.monthly_limit))
         self._count(1, 0)        # counted before sending: a request that times out may still be billed
-        url, _ = PROVIDERS[self.c.provider]
-        if self.c.provider == 'anthropic':
-            headers = {'x-api-key': self.c.key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json'}
-            body = {'model': self.c.model, 'max_tokens': max_tokens, 'system': system,
+        url, _ = PROVIDERS[c.provider]
+        if c.provider == 'anthropic':
+            headers = {'x-api-key': c.key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json'}
+            body = {'model': c.model, 'max_tokens': max_tokens, 'system': system,
                     'messages': [{'role': 'user', 'content': user}]}
         else:
-            headers = {'Authorization': f'Bearer {self.c.key}', 'content-type': 'application/json'}
-            body = openai_body(self.c.model, system, user, max_tokens)
+            headers = {'Authorization': f'Bearer {c.key}', 'content-type': 'application/json'}
+            body = openai_body(c.model, system, user, max_tokens)
         try:
             async with httpx.AsyncClient(timeout=timeout, transport=self.transport) as client:
                 r = await client.post(url, headers=headers, json=body)
         except httpx.HTTPError as e:
-            raise AIError(f'Cannot reach the AI provider ({e.__class__.__name__}).') from e
+            raise AIError(tr('Cannot reach the AI provider ({error}).', error=e.__class__.__name__)) from e
         if r.status_code in (401, 403):
-            raise AIError(f'The AI provider ({self.c.provider}) refused the key: {provider_error(r)} '
-                          f'Check AI_API_KEY, and that the key may use the model {self.c.model}.')
+            raise AIError(tr('The AI provider ({provider}) refused the key: {error} '
+                             'Check the key, and that it may use the model {model}.', provider=c.provider,
+                             error=provider_error(r), model=c.model))
         if r.status_code != 200:
-            raise AIError(f'The AI provider answered {r.status_code}: {provider_error(r)}')
+            raise AIError(tr('The AI provider answered {code}: {error}', code=r.status_code, error=provider_error(r)))
         data = r.json()
-        if self.c.provider == 'anthropic':
+        if c.provider == 'anthropic':
             text = ''.join(part.get('text', '') for part in data.get('content', []) if part.get('type') == 'text')
             u = data.get('usage') or {}
             tokens = int(u.get('input_tokens', 0)) + int(u.get('output_tokens', 0))
@@ -79,6 +97,12 @@ class AI:
             tokens = int((data.get('usage') or {}).get('total_tokens', 0))
         self._count(0, tokens)
         return text.strip()
+
+    async def try_key(self, key: str) -> AIConfig:
+        """One tiny request with a key the owner pasted; raises AIError with the provider's words if refused."""
+        config = self.base.with_key(key)
+        await self.ask('Answer with one word.', 'Say OK.', max_tokens=5, timeout=30, config=config)
+        return config
 
 
 def openai_body(model: str, system: str, user: str, max_tokens: int) -> dict:
@@ -113,6 +137,11 @@ SPAM_SYSTEM = (
     'disagreement, rudeness and short replies are NOT spam. Answer with JSON only: '
     '{"spam": 0.0-1.0, "why": "a few words in English"}'
 )
+
+
+def spam_system(language: str = 'English') -> str:
+    """The spam check, its «why» in the owners' language — it is shown to them as is."""
+    return SPAM_SYSTEM.replace('a few words in English', f'a few words in {language}')
 
 
 def spam_prompt(text: str) -> str:

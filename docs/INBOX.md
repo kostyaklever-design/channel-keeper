@@ -1,5 +1,7 @@
 # Messages to the channel and suggested posts
 
+[Русская версия](INBOX.ru.md)
+
 Since 2025 Telegram lets anyone write to a channel and suggest a post — free, or offering Stars. Both arrive in the channel's direct messages. The bot brings them to the owners' private chat, so you see them next to everything else.
 
 ## Turn it on

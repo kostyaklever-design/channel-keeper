@@ -63,8 +63,24 @@ def test_version_matches_changelog():
     assert top.group(1) == version, f'VERSION is {version}, newest CHANGELOG entry is {top.group(1)}'
 
 
+PAGES = ['README.md', 'README.ru.md'] + sorted(str(p.relative_to(ROOT)) for p in (ROOT / 'docs').glob('*.md'))
+
+
+def test_every_doc_has_both_languages():
+    """2.0.2: the documentation is complete in English and Russian — each page has its pair, with as many sections."""
+    docs = ROOT / 'docs'
+    english = sorted(p for p in docs.glob('*.md') if not p.name.endswith('.ru.md'))
+    assert len(english) >= 10
+    for page in english:
+        ru = page.with_name(page.stem + '.ru.md')
+        assert ru.exists(), f'{page.name} has no Russian version {ru.name}'
+        count = lambda p: len(re.findall(r'^#{1,3} ', p.read_text(encoding='utf-8'), re.M))
+        assert count(page) == count(ru), f'{page.name} and {ru.name} have different sections'
+        assert f'({ru.name})' in page.read_text(encoding='utf-8') and f'({page.name})' in ru.read_text(encoding='utf-8')
+
+
 def test_readme_links_exist():
-    for readme in ('README.md', 'README.ru.md', 'docs/INSTALL.md', 'docs/INSTALL.ru.md'):
+    for readme in PAGES:
         base = (ROOT / readme).parent
         for target in re.findall(r'\]\((?!https?://)([^)#]+)\)', read(readme)):
             assert (base / target).exists(), f'{readme} links to a missing file: {target}'
@@ -80,7 +96,7 @@ def anchors(path: str) -> set[str]:
 
 def test_readme_anchors_exist():
     """A link to a heading that was renamed opens the page at the top: the reader is lost."""
-    for readme in ('README.md', 'README.ru.md', 'docs/INSTALL.md', 'docs/INSTALL.ru.md'):
+    for readme in PAGES:
         base = (ROOT / readme).parent
         for target, anchor in re.findall(r'\]\((?!https?://)([^)#]*)#([^)]+)\)', read(readme)):
             page = str(((base / target) if target else (ROOT / readme)).resolve().relative_to(ROOT.resolve()))

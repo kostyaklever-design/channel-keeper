@@ -2,6 +2,7 @@
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 
+from .i18n import tr
 from .state import Action
 
 # Button data: "<action>:<user id>". Telegram allows 64 bytes, this stays far below.
@@ -36,25 +37,36 @@ TITLES = {
 }
 
 
+# The weekly report's clean-up lines: (log kind, label). Labels are translated where they are shown.
+CLEANUP = (('warn', 'warnings'), ('ban', 'bans'), ('manual_ban', 'bans by admins'), ('captcha_kicked', 'removed by captcha'),
+           ('flood', 'muted for flood'), ('first_minutes', 'held in fresh posts'), ('ai_flag', 'flagged by AI'),
+           ('profile_flag', 'flagged for the profile'), ('learned_flag', 'flagged by the learning filter'),
+           ('review_deleted', 'deleted after your review'), ('ai_deleted', 'deleted after your review (before 1.8.6)'))
+
+
+def title(kind: str) -> str:
+    return tr(TITLES[kind]) if kind in TITLES else kind
+
+
 def action_text(kind: str, user_name: str = '', user_id: int | None = None, reason: str = '',
                 excerpt: str = '') -> str:
-    lines = [TITLES.get(kind, kind)]
+    lines = [title(kind)]
     if user_id is not None:
-        lines.append(f'Who: {user_name} (id {user_id})')
+        lines.append(tr('Who: {name} (id {id})', name=user_name, id=user_id))
     if reason:
-        lines.append(f'{"Post" if kind == "post" else "Why"}: {reason}')
+        lines.append(tr('Post: {what}', what=reason) if kind == 'post' else tr('Why: {what}', what=reason))
     if excerpt:
         short = excerpt if len(excerpt) <= 200 else excerpt[:200] + '…'
-        lines.append(f'Message: {short}')
+        lines.append(tr('Message: {text}', text=short))
     return '\n'.join(lines)
 
 
 def buttons_for(kind: str, user_id: int) -> list[tuple[str, str]]:
     """[(label, callback_data)] under a notification."""
     if kind == 'ban':
-        return [('Unban', f'{UNBAN}:{user_id}'), ('OK', f'{OK}:0')]
+        return [(tr('Unban'), f'{UNBAN}:{user_id}'), ('OK', f'{OK}:0')]
     if kind == 'warn':
-        return [('Clear warning', f'{FORGIVE}:{user_id}'), ('OK', f'{OK}:0')]
+        return [(tr('Clear warning'), f'{FORGIVE}:{user_id}'), ('OK', f'{OK}:0')]
     return []
 
 
@@ -68,12 +80,12 @@ def parse_button(data: str) -> tuple[str, int] | None:
 
 def log_text(actions: list[Action], tz: str = 'UTC') -> str:
     if not actions:
-        return 'Nothing yet.'
+        return tr('Nothing yet.')
     zone = ZoneInfo(tz)
     out = []
     for a in actions:
         when = datetime.fromtimestamp(a.at, timezone.utc).astimezone(zone).strftime('%d.%m %H:%M')
         who = f' {a.user_name}' if a.user_name else ''
         why = f' — {a.reason}' if a.reason else ''
-        out.append(f'{when} {TITLES.get(a.kind, a.kind)}{who}{why}')
+        out.append(f'{when} {title(a.kind)}{who}{why}')
     return '\n'.join(out)

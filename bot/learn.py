@@ -12,6 +12,7 @@ import re
 from collections import Counter
 from dataclasses import dataclass, field
 
+from .i18n import tr
 from .moderation import joined_letters, skeleton
 
 MIN_EACH = 20          # examples of each kind before the filter says anything
@@ -36,9 +37,9 @@ class Model:
 
     def progress(self) -> str:
         if self.ready:
-            return f'on — learned from {self.docs["spam"]} spam and {self.docs["ok"]} kept messages'
-        return (f'learning — {min(self.docs["spam"], MIN_EACH)}/{MIN_EACH} spam, '
-                f'{min(self.docs["ok"], MIN_EACH)}/{MIN_EACH} kept (press Keep on reviews to teach it)')
+            return tr('on — learned from {spam} spam and {ok} kept messages', spam=self.docs['spam'], ok=self.docs['ok'])
+        return tr('learning — {spam}/{need} spam, {ok}/{need} kept (press Keep on reviews to teach it)',
+                  spam=min(self.docs['spam'], MIN_EACH), ok=min(self.docs['ok'], MIN_EACH), need=MIN_EACH)
 
     def spam_probability(self, text: str) -> float:
         words = tokens(text)

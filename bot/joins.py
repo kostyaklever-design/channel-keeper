@@ -12,10 +12,12 @@ import time
 from telegram import Update
 from telegram.ext import ContextTypes
 
+from .i18n import of_code, tr
 from .probation import profile_reason
 from .runtime import cfg, log, markup, settings, state
 from .runtime import name_of as _name
 
+LANG = 'join_lang'         # bot_data: {user id: the newcomer's language}, for the «time is up» note
 WINDOW = 5 * 60 - 20       # Telegram lets the bot write to the person for 5 minutes after the request
 
 
@@ -27,12 +29,12 @@ def parse_button(data: str) -> tuple[str, int] | None:
 
 
 async def _ask_owners(ctx, user, why: str, bio: str) -> None:
-    text = (f'🚪 {_name(user)} (id {user.id}) asks to join the group — {why}.'
-            + (f'\nProfile: {bio[:200]}' if bio else ''))
+    text = (tr('🚪 {name} (id {id}) asks to join the group — {why}.', name=_name(user), id=user.id, why=why)
+            + ('\n' + tr('Profile: {bio}', bio=bio[:200]) if bio else ''))
     for owner in cfg.admin_ids:
         try:
-            await ctx.bot.send_message(owner, text, reply_markup=markup([('✅ Approve', f'j:ok:{user.id}'),
-                                                                         ('❌ Decline', f'j:no:{user.id}')]))
+            await ctx.bot.send_message(owner, text, reply_markup=markup([(tr('✅ Approve'), f'j:ok:{user.id}'),
+                                                                         (tr('❌ Decline'), f'j:no:{user.id}')]))
         except Exception as e:
             log.info('could not ask %s about a join request: %s', owner, e)
 
@@ -45,49 +47,53 @@ async def on_request(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     user, bio = req.from_user, req.bio or ''
     suspicious = profile_reason(bio, settings().spam_words) if settings().profile_check else None
     if mode == 'owners' or suspicious:
-        await _ask_owners(ctx, user, suspicious or 'please decide', bio)
+        await _ask_owners(ctx, user, suspicious or tr('please decide'), bio)
         return
     if not state.join_add(user.id, _name(user), time.time() + WINDOW):
         return
     c = settings().captcha
+    lang = of_code(getattr(user, 'language_code', None))       # a newcomer reads their own language
+    ctx.bot_data.setdefault(LANG, {})[user.id] = lang
     try:
-        m = await ctx.bot.send_message(req.user_chat_id, f'To join «{req.chat.title}», press the button within 4 minutes.',
-                                       reply_markup=markup([(f'✅ {c.button}', f'j:me:{user.id}')]))
+        m = await ctx.bot.send_message(req.user_chat_id, tr('To join «{title}», press the button within 4 minutes.', lang,
+                                                            title=req.chat.title),
+                                       reply_markup=markup([(f'✅ {c.label(lang)}', f'j:me:{user.id}')]))
         state.join_set_message(user.id, m.message_id)
     except Exception as e:
         state.join_take(user.id)
         log.info('cannot write to %s about their join request: %s', user.id, e)
-        await _ask_owners(ctx, user, 'the bot could not send them the button', bio)
+        await _ask_owners(ctx, user, tr('the bot could not send them the button'), bio)
 
 
 async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE, action: str, user_id: int) -> None:
     q = update.callback_query
     if action == 'me':
+        lang = of_code(getattr(q.from_user, 'language_code', None))
         if q.from_user.id != user_id:
-            await q.answer('This button is for someone else.', show_alert=True)
+            await q.answer(tr('This button is for someone else.', lang), show_alert=True)
             return
         if state.join_take(user_id) is None:
-            await q.answer('Too late — send the request again.', show_alert=True)
+            await q.answer(tr('Too late — send the request again.', lang), show_alert=True)
             return
         ok = await _decide(ctx, user_id, True)
         state.mark_human(user_id)
-        await q.answer('Welcome!' if ok else 'Something went wrong — the admins will see your request.')
+        await q.answer(tr('Welcome!', lang) if ok else tr('Something went wrong — the admins will see your request.', lang))
         try:
-            await q.edit_message_text('✅ Welcome — you can write in the group now.' if ok else
-                                      'Your request is waiting for the admins.', reply_markup=None)
+            await q.edit_message_text(tr('✅ Welcome — you can write in the group now.', lang) if ok else
+                                      tr('Your request is waiting for the admins.', lang), reply_markup=None)
         except Exception:
             pass
         return
     if q.from_user.id not in cfg.admin_ids:
-        await q.answer('Only the owners can do this.', show_alert=True)
+        await q.answer(tr('Only the owners can do this.'), show_alert=True)
         return
     state.join_take(user_id)
     ok = await _decide(ctx, user_id, action == 'ok')
     if action == 'ok' and ok:
         state.mark_human(user_id)
     who = _name(q.from_user)
-    outcome = (f'{"✅ Approved" if action == "ok" else "❌ Declined"} by {who}.' if ok
-               else 'Already handled (in the app, or the request expired).')
+    outcome = ((tr('✅ Approved by {who}.', who=who) if action == 'ok' else tr('❌ Declined by {who}.', who=who)) if ok
+               else tr('Already handled (in the app, or the request expired).'))
     await q.answer()
     try:
         await q.edit_message_text(f'{getattr(q.message, "text", None) or ""}\n\n{outcome}'.strip(), reply_markup=None)
@@ -101,7 +107,7 @@ async def _decide(ctx, user_id: int, approve: bool) -> bool:
             await ctx.bot.approve_chat_join_request(cfg.group_id, user_id)
         else:
             await ctx.bot.decline_chat_join_request(cfg.group_id, user_id)
-            state.log_action('join_declined', user_id, state.name_of(user_id), 'join request')
+            state.log_action('join_declined', user_id, state.name_of(user_id), tr('join request'))
         return True
     except Exception as e:
         log.warning('join request of %s: %s', user_id, e)
@@ -119,10 +125,11 @@ async def joins_tick(ctx: ContextTypes.DEFAULT_TYPE) -> None:
             await ctx.bot.decline_chat_join_request(cfg.group_id, user_id)
         except Exception as e:
             log.info('decline %s: %s', user_id, e)
-        state.log_action('join_declined', user_id, name, 'no press in time')
+        state.log_action('join_declined', user_id, name, tr('no press in time'))
         if message_id:
             try:
-                await ctx.bot.edit_message_text('⌛ Time is up. Send the join request again to try once more.',
+                lang = ctx.bot_data.get(LANG, {}).pop(user_id, 'en')
+                await ctx.bot.edit_message_text(tr('⌛ Time is up. Send the join request again to try once more.', lang),
                                                 chat_id=user_id, message_id=message_id)
             except Exception:
                 pass

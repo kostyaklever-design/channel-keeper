@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
+from .i18n import tr
+
 QUIET, LIMIT, RATIO, GAP = 'quiet', 'limit', 'ratio', 'gap'
 
 
@@ -83,16 +85,16 @@ def blocker(rules: Rules, now: datetime, tz: str, history: list[tuple[datetime, 
     local = now.astimezone(zone)
     end = _in_quiet(rules, local)
     if end:
-        return QUIET, f'quiet hours until {end:%H:%M}'
+        return QUIET, tr('quiet hours until {at}', at=f'{end:%H:%M}')
     if rules.daily_limit:
         today = sum(1 for at, _ in history if at.astimezone(zone).date() == local.date())
         if today >= rules.daily_limit:
-            return LIMIT, f'{today} posts today, the limit is {rules.daily_limit} — tomorrow'
+            return LIMIT, tr('{n} posts today, the limit is {limit} — tomorrow', n=today, limit=rules.daily_limit)
     if label == 'news' and rules.news_in_a_row and news_streak(history) >= rules.news_in_a_row:
-        return RATIO, (f'rule 1 : {rules.news_in_a_row}: {news_streak(history)} news in a row — '
-                       f'waits for your own post')
+        return RATIO, tr('rule 1 : {limit}: {n} news in a row — waits for your own post',
+                         limit=rules.news_in_a_row, n=news_streak(history))
     if from_queue and rules.gap_minutes and history:
         nxt = history[0][0] + timedelta(minutes=rules.gap_minutes)
         if now < nxt:
-            return GAP, f'{rules.gap_minutes} min between posts — after {nxt.astimezone(zone):%H:%M}'
+            return GAP, tr('{n} min between posts — after {at}', n=rules.gap_minutes, at=f'{nxt.astimezone(zone):%H:%M}')
     return None

@@ -11,6 +11,8 @@ from telegram import (InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhot
 from telegram.error import BadRequest, Forbidden
 from telegram.ext import ContextTypes, filters
 
+from . import i18n
+from .i18n import tr
 from .ai import AI
 from .config import AIConfig, Config
 from .content import ContentError, ContentSource
@@ -73,6 +75,14 @@ current = {'settings': Settings(), 'posts': [], 'sources': [], 'loaded': False}
 
 def settings() -> Settings:
     return current['settings']
+
+
+def owner_lang() -> str:
+    """The owners' language: keeper.yaml `language:` wins, then /lang, then an owner's Telegram language."""
+    return settings().language or state.get('lang') or 'en'
+
+
+i18n.use(owner_lang)
 
 
 async def refresh_content(ctx: ContextTypes.DEFAULT_TYPE | None = None) -> None:
@@ -210,29 +220,35 @@ async def retire_notes(ctx: ContextTypes.DEFAULT_TYPE, user_id: int, outcome: st
 
 # ---------- the channel ----------
 FAILED: dict[str, str] = {}      # post id -> why the last attempt failed, in words an owner can act on
+CHANNEL_PROBLEM: set[str] = set()  # post ids whose last failure was the channel's (rights, no channel), not theirs
 
 
-def explain(e: Exception) -> str:
-    """Telegram's error in plain words, with what to do."""
+def explain(e: Exception) -> tuple[str, bool]:
+    """Telegram's error in plain words, with what to do; True when it is the channel's problem, not the post's."""
     text = str(e)
     low = text.lower()
     if 'not enough rights' in low or 'need administrator rights' in low or 'have no rights' in low:
-        return f'the bot has no right to post in the channel — channel → Administrators → the bot → «Post messages» ({text})'
+        return tr('the bot has no right to post in the channel — channel → Administrators → the bot → «Post messages» '
+                  '({error})', error=text), True
     if 'chat not found' in low or 'bot is not a member' in low or 'forbidden' in low:
-        return f'the bot is not an admin of the channel, or CHANNEL_ID is wrong ({text})'
+        return tr('the bot is not an admin of the channel, or CHANNEL_ID is wrong ({error})', error=text), True
     if "can't parse entities" in low:
-        return f'the formatting of the text is broken ({text})'
+        return tr('the formatting of the text is broken ({error})', error=text), False
     if 'retry after' in low or 'flood' in low:
-        return f'Telegram asked to slow down — try again in a minute ({text})'
-    return text
+        return tr('Telegram asked to slow down — try again in a minute ({error})', error=text), True
+    return text, False
 
 
 def why_failed(post_id: str) -> str:
-    return FAILED.get(post_id, 'unknown error — see the log')
+    return FAILED.get(post_id) or tr('unknown error — see the log')
+
+
+def _failure(post_id: str, reason: str, channel: bool) -> None:
+    FAILED[post_id] = reason
+    (CHANNEL_PROBLEM.add if channel else CHANNEL_PROBLEM.discard)(post_id)
 
 
 MAX_TRIES = 3
-GLOBAL_PROBLEMS = ('not an admin', 'no right', 'no channel chosen', 'slow down')   # not the post's fault
 ALERT_EVERY = 3600
 
 
@@ -241,11 +257,11 @@ async def failed(ctx, post_id: str, what: str) -> bool:
     reason; the owners are told). A problem with the channel itself (rights, no channel) is never the post's
     fault: the owners are told at most once an hour and the post waits."""
     reason = why_failed(post_id)
-    if any(p in reason for p in GLOBAL_PROBLEMS):
+    if post_id in CHANNEL_PROBLEM:
         last = ctx.bot_data.get('channel_alert', 0)
         if time.time() - last > ALERT_EVERY:
             ctx.bot_data['channel_alert'] = time.time()
-            await notify_admins(ctx, f'⚠️ Cannot publish to the channel: {reason}. Posts wait until this is fixed.')
+            await notify_admins(ctx, tr('⚠️ Cannot publish to the channel: {why}. Posts wait until this is fixed.', why=reason))
         return False
     key = f'fail:{post_id}'
     tries = int(state.get(key) or 0) + 1
@@ -253,7 +269,8 @@ async def failed(ctx, post_id: str, what: str) -> bool:
         state.put(key, str(tries))
         return False
     state.db.execute('DELETE FROM kv WHERE key=?', (key,))
-    await notify_admins(ctx, f'⚠️ {what} was not published after {MAX_TRIES} tries: {reason}. It is set aside.')
+    await notify_admins(ctx, tr('⚠️ {what} was not published after {n} tries: {why}. It is set aside.',
+                                what=what, n=MAX_TRIES, why=reason))
     return True
 async def send_post(ctx: ContextTypes.DEFAULT_TYPE, chat_id: int, post: Post, text: str, buttons=()) -> int | None:
     """Send a post (with its picture, if any) to a chat; returns the message id, None when the picture is missing."""
@@ -307,7 +324,7 @@ async def _send_media(ctx, chat_id: int, post: Post, text: str, mode, buttons) -
         ALBUMS.clear()
     ALBUMS[ids[0]] = ids
     if buttons:
-        m = await ctx.bot.send_message(chat_id, '⬆️ The album above', reply_markup=markup(buttons))
+        m = await ctx.bot.send_message(chat_id, tr('⬆️ The album above'), reply_markup=markup(buttons))
         return m.message_id
     return ids[0]
 
@@ -317,18 +334,19 @@ async def publish(ctx: ContextTypes.DEFAULT_TYPE, post: Post, text: str | None =
     text = post.text if text is None else text
     if cfg.channel_id is None:
         log.warning('post %s waits: no channel yet — send /setup to the bot', post.id)
-        FAILED[post.id] = 'no channel chosen yet — send /setup'
+        _failure(post.id, tr('no channel chosen yet — send /setup'), True)
         return None
     try:
         message_id = await send_post(ctx, cfg.channel_id, post, text)
         if message_id is None:
-            FAILED[post.id] = f'the picture {post.image} is missing'
+            _failure(post.id, tr('the picture {name} is missing', name=post.image), False)
             return None
     except Exception as e:
         log.error('post %s failed: %s', post.id, e)
-        FAILED[post.id] = explain(e)
+        _failure(post.id, *explain(e))
         return None
     FAILED.pop(post.id, None)
+    CHANNEL_PROBLEM.discard(post.id)
     state.mark_sent(post.id, post.label)
     log.info('published post %s', post.id)
     state.log_action('post', reason=post.id, excerpt=text)

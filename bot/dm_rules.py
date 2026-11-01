@@ -4,6 +4,7 @@ import json
 import re
 from datetime import datetime, timedelta, timezone
 
+from .i18n import tr
 from .schedule import CAPTION_LIMIT, TEXT_LIMIT
 
 NOW, HOUR, MORNING, PICK, CANCEL, EDIT = 'now', 'h1', 'am', 'pick', 'x', 'ai'
@@ -20,7 +21,7 @@ def next_in(cycle: tuple, current: int) -> int:
 
 
 def hours_label(h: int) -> str:
-    return {0: 'off', -1: 'until unpinned', 168: '7 days'}.get(h, f'{h} h')
+    return {0: tr('off'), -1: tr('until unpinned'), 168: tr('7 days')}.get(h) or tr('{n} h', n=h)
 
 
 def buttons(post_id: int, ai: bool = False, p=None) -> list[list[tuple[str, str]]]:
@@ -29,12 +30,14 @@ def buttons(post_id: int, ai: bool = False, p=None) -> list[list[tuple[str, str]
     pin = p.pin_hours if p is not None else 0
     delete = p.delete_hours if p is not None else 0
     ad = bool(p.ad) if p is not None else False
-    last = [('🗓 Pick a time', f'p:{PICK}:{post_id}')] + ([('✨ Edit with AI', f'p:{EDIT}:{post_id}')] if ai else [])
-    return [[('✅ Publish now', f'p:{NOW}:{post_id}'), ('🗑 Cancel', f'p:{CANCEL}:{post_id}')],
-            [('🕐 In 1 hour', f'p:{HOUR}:{post_id}'), (f'🌅 Tomorrow {MORNING_HOUR}:00', f'p:{MORNING}:{post_id}')],
+    last = [(tr('🗓 Pick a time'), f'p:{PICK}:{post_id}')] + ([(tr('✨ Edit with AI'), f'p:{EDIT}:{post_id}')] if ai else [])
+    return [[(tr('✅ Publish now'), f'p:{NOW}:{post_id}'), (tr('🗑 Cancel'), f'p:{CANCEL}:{post_id}')],
+            [(tr('🕐 In 1 hour'), f'p:{HOUR}:{post_id}'), (tr('🌅 Tomorrow {hour}:00', hour=MORNING_HOUR), f'p:{MORNING}:{post_id}')],
             last,
-            [(f'🔗 Buttons: {n_links}', f'p:{LINKS}:{post_id}'), (f'📣 Ad label: {"on" if ad else "off"}', f'p:{AD}:{post_id}')],
-            [(f'📌 Pin: {hours_label(pin)}', f'p:{PIN}:{post_id}'), (f'⏱ Delete: {hours_label(delete)}', f'p:{DELETE}:{post_id}')]]
+            [(tr('🔗 Buttons: {n}', n=n_links), f'p:{LINKS}:{post_id}'),
+             (tr('📣 Ad label: {state}', state=tr('on') if ad else tr('off')), f'p:{AD}:{post_id}')],
+            [(tr('📌 Pin: {hours}', hours=hours_label(pin)), f'p:{PIN}:{post_id}'),
+             (tr('⏱ Delete: {hours}', hours=hours_label(delete)), f'p:{DELETE}:{post_id}')]]
 
 
 def parse_links(text: str) -> list[tuple[str, str]] | str:
@@ -46,15 +49,15 @@ def parse_links(text: str) -> list[tuple[str, str]] | str:
     for line in [l.strip() for l in text.splitlines() if l.strip()]:
         m = re.fullmatch(r'(.+?)\s+[-–—|]\s+((?:https?|tg)://\S+)', line)
         if not m:
-            return f'Cannot read «{line[:40]}». Write: Button text - https://link'
+            return tr('Cannot read «{line}». Write: Button text - https://link', line=line[:40])
         label = m.group(1).strip()
         if len(label) > 40:
-            return f'«{label[:20]}…» is too long for a button — up to 40 characters.'
+            return tr('«{label}…» is too long for a button — up to 40 characters.', label=label[:20])
         out.append((label, m.group(2)))
     if not out:
-        return 'Write: Button text - https://link'
+        return tr('Write: Button text - https://link')
     if len(out) > MAX_LINKS:
-        return f'Up to {MAX_LINKS} buttons.'
+        return tr('Up to {n} buttons.', n=MAX_LINKS)
     return out
 
 
@@ -64,7 +67,7 @@ def with_label(text_html: str, label: str, on: bool) -> str:
 
 
 def scheduled_buttons(post_id: int) -> list[list[tuple[str, str]]]:
-    return [[('✅ Publish now', f'p:{NOW}:{post_id}'), ('🗑 Cancel', f'p:{CANCEL}:{post_id}')]]
+    return [[(tr('✅ Publish now'), f'p:{NOW}:{post_id}'), (tr('🗑 Cancel'), f'p:{CANCEL}:{post_id}')]]
 
 
 def parse_button(data: str) -> tuple[str, int] | None:
@@ -80,7 +83,7 @@ def parse_when(text: str, now: datetime) -> datetime | str:
     Returns the moment, or the reason it cannot be used."""
     m = re.fullmatch(r'\s*(?:(\d{1,2})\.(\d{1,2})(?:\.(\d{4}))?\s+)?(\d{1,2})[:.](\d{2})\s*', text or '')
     if not m:
-        return 'Send the time like 18:30 or 03.11 18:30.'
+        return tr('Send the time like 18:30 or 03.11 18:30.')
     day, month, year, hour, minute = m.groups()
     try:
         if day:
@@ -93,11 +96,11 @@ def parse_when(text: str, now: datetime) -> datetime | str:
             if at <= now:
                 at += timedelta(days=1)
     except ValueError:
-        return 'There is no such date or time.'
+        return tr('There is no such date or time.')
     if at <= now:
-        return 'That time has passed.'
+        return tr('That time has passed.')
     if at - now > timedelta(days=366):
-        return 'More than a year ahead — pick a closer date.'
+        return tr('More than a year ahead — pick a closer date.')
     return at
 
 
@@ -111,6 +114,7 @@ def quick_time(action: str, now: datetime) -> datetime:
 def too_long(text_len: int, has_photo: bool) -> str | None:
     limit = CAPTION_LIMIT if has_photo else TEXT_LIMIT
     if text_len > limit:
-        what = 'a photo caption' if has_photo else 'a post'
-        return f'Telegram allows {limit} characters for {what}; this one has {text_len}. Shorten by {text_len - limit}.'
+        what = tr('a photo caption') if has_photo else tr('a post')
+        return tr('Telegram allows {limit} characters for {what}; this one has {n}. Shorten by {cut}.',
+                  limit=limit, what=what, n=text_len, cut=text_len - limit)
     return None

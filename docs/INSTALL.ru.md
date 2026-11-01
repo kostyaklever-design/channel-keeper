@@ -7,6 +7,11 @@
 ## Railway
 Без своего сервера, всё в браузере. Railway платный по потреблению, цены — railway.com/pricing.
 
+**В один клик:** [![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/channel-keeper) → войти → вставить токен в `BOT_TOKEN` → **Deploy**. Railway сам создаст проект и том `/data`. Дальше — [шаги ниже](#после-любого-способа-права-setup-команды).
+Бот при этом работает с настройками по умолчанию — на своём языке (русском, если ваш Telegram на русском). Чтобы поменять их (стоп-слова, тексты бота в чате, русские тексты из `examples/keeper.ru.yaml`), положите `keeper.yaml` в свой маленький приватный репозиторий и укажите его в переменной `CONTENT_REPO` ([CONFIG](CONFIG.ru.md#контент-в-отдельном-приватном-репозитории-по-желанию)).
+
+**Вручную** — если нужна своя копия кода (чтобы править `posts.yaml` и `keeper.yaml` на GitHub):
+
 **1. Своя копия кода на GitHub** — приватная, потому что `posts.yaml` — это ваш контент-план.
 - На странице этого репозитория нажмите **Use this template → Create a new repository**, выберите **Private**, **Create repository**.
 - Нет такой кнопки? Скачайте архив из **Releases**, затем GitHub → **New repository** → **Private** → **Create** → **uploading an existing file** → перетащите всё из архива → **Commit changes**.
@@ -34,7 +39,7 @@ docker run -d --name channel-keeper --restart unless-stopped \
 - Том `channel-keeper-data` хранит память бота между обновлениями.
 - Логи: `docker logs -f channel-keeper`.
 - Обновление: `docker build -t channel-keeper .`, затем `docker rm -f channel-keeper` и тот же `docker run` — память остаётся в томе.
-- Ваши `posts.yaml`, `keeper.yaml`, `sources.yaml`: правьте их в папке до `docker build` или держите в отдельном репозитории через `CONTENT_REPO` ([CONFIG](CONFIG.md)).
+- Ваши `posts.yaml`, `keeper.yaml`, `sources.yaml`: правьте их в папке до `docker build` или держите в отдельном репозитории через `CONTENT_REPO` ([CONFIG](CONFIG.ru.md)).
 
 ## Свой сервер
 Debian или Ubuntu, с sudo.
@@ -62,28 +67,14 @@ sudo bash install.sh
 
 **4. `/setup`.** Откройте бота в личке → **Start** → `/setup`. Кто сделал это первым, становится владельцем. Нажмите свой канал, потом группу: бот проверит права и перечислит, чего не хватает. `/setup` можно отправить снова в любой момент, чтобы перепроверить.
 
-**5. Меню команд (по желанию, 1 минута).** @BotFather → `/setcommands` → ваш бот → отправьте:
-```
-setup - выбрать канал и группу, проверить права
-queue - что и когда выйдет
-drafts - черновики, которые ждут вас
-sources - ленты и их последняя проверка
-report - неделя канала
-log - что сделал бот
-ai - черновики от ИИ (нужен ключ)
-forget - удалить всё о человеке
-ban - в группе: ответом на сообщение забанить автора
-unban - в группе: снять бан
-id - id чата и ваш id
-version - какая версия запущена
-```
+**5. Язык и меню команд.** Ничего делать не нужно: бот сам настраивает кнопку «Меню» и говорит по-русски, если ваш Telegram на русском, иначе по-английски. Сменить: `/lang ru`, `/lang en` или `/lang auto`.
 
-**Первый пост:** отправьте боту в личку любой текст → **✅ Опубликовать сейчас**.
+**Первый пост:** отправьте боту в личку любой текст → **✅ Опубликовать**.
 
 **Дальше, по желанию:**
-- русские тексты бота в чате и ваши настройки — скопируйте `examples/keeper.ru.yaml` в `keeper.yaml` ([SETTINGS](SETTINGS.md));
-- ваш YouTube, блог и новости — `sources.yaml` ([SOURCES](SOURCES.md)), пример на русском — `examples/sources.ru.yaml`;
-- ИИ — одна переменная `AI_API_KEY` ([AI](AI.md)).
+- русские тексты бота в чате и ваши настройки — скопируйте `examples/keeper.ru.yaml` в `keeper.yaml` ([SETTINGS](SETTINGS.ru.md));
+- ваш YouTube, блог и новости — `sources.yaml` ([SOURCES](SOURCES.ru.md)), пример на русском — `examples/sources.ru.yaml`;
+- ИИ — `/setup` → **🔑 Добавить ключ ИИ**, вставьте ключ OpenAI или Anthropic ([AI](AI.ru.md)).
 
 ## Если что-то не так
 | Видите | Сделайте |

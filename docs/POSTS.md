@@ -1,5 +1,7 @@
 # Scheduled posts
 
+[Русская версия](POSTS.ru.md)
+
 Every minute the bot publishes posts from `posts.yaml` whose time has come.
 It re-reads the file every 5 minutes — from this repository or from `CONTENT_REPO` (see [CONFIG](CONFIG.md)).
 
@@ -18,7 +20,7 @@ Albums: Telegram does not allow buttons under an album, so 🔗 Buttons works on
 ### Ad posts: buttons, label, pin, auto-delete
 Under every preview there are four more buttons:
 - **🔗 Buttons** — reply with up to 3 lines `Button text - https://link`; they appear under the post. `-` removes them.
-- **📣 Ad label** — puts `ad_label` from `keeper.yaml` («Advertisement» by default; for a Russian channel `Реклама`) in bold as the first line. If the advertiser or an erid must be shown, write them in the text yourself — the bot does not file anything anywhere and does not promise that a post meets any law.
+- **📣 Ad label** — puts `ad_label` from `keeper.yaml` («Advertisement» by default, «Реклама» when the bot speaks Russian) in bold as the first line. If the advertiser or an erid must be shown, write them in the text yourself — the bot does not file anything anywhere and does not promise that a post meets any law.
 - **📌 Pin** — off → 24 h → 48 h → 7 days → until you unpin. Needs «Edit messages» for the bot in the channel; without it the post still goes out and you are told.
 - **⏱ Delete** — off → 24 h → 48 h → 72 h (the 1/24, 2/48 formats). Never less than 24 hours. Needs «Delete messages» in the channel.
 

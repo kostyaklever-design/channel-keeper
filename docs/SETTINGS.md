@@ -1,6 +1,8 @@
 # Channel settings — keeper.yaml
 
-Settings that are not secrets. The file is optional: without it the bot uses English defaults.
+[Русская версия](SETTINGS.ru.md)
+
+Settings that are not secrets. The file is optional: without it the bot uses its defaults, in the bot's language (English or Russian — see `language`). A setting you write here stays exactly as written; one equal to the English default still follows the language.
 Edit it on GitHub (pencil icon) → **Commit**. The bot applies changes within 5 minutes.
 If the file has a mistake, the bot keeps the previous settings and writes the reason to the log; the GitHub check also turns red.
 
@@ -48,14 +50,16 @@ probation:                   # off = no probation
 
 profile_check: true          # a link or spam word in a newcomer's profile -> owners decide (Delete / Keep)
 
-ad_label: Advertisement      # the first line of a post marked as an ad (📣 under the preview)
+ad_label: Advertisement      # the first line of a post marked as an ad (📣 under the preview); «Реклама» for a Russian bot
 
 join_requests: captcha       # when the group approves new members: captcha | owners | off (see MODERATION.md)
 
 learning_filter: true        # learns from your Delete / Keep; only asks you, never deletes (see MODERATION.md)
 
-read_more: "Read on {source} →"   # the short link under news from feeds; {source} = the site
-ai_language: English         # the language of AI retellings
+read_more: "Read on {source} →"   # the short link under news from feeds; {source} = the site; «Читать на {source} →» in Russian
+ai_language: English         # the language of AI retellings; Russian for a Russian bot unless you set another
+language: auto                # the bot's language: auto (the owners' Telegram), en or ru. The chat's default texts,
+                              # the captcha, «Advertisement» and «Read on …» follow it unless you set your own here
 ```
 
 - `messages` also has `flood`, `first_minutes` and `probation` — the notes for those rules.

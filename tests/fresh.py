@@ -9,7 +9,7 @@ import bot
 
 # Modules that hold the running bot's memory (they create it on import from the environment).
 RUNTIME = ('runtime', 'dm_posts', 'channel_queue', 'draft_flow', 'feeds', 'captcha', 'guard', 'setup', 'ai_flow',
-           'report', 'review', 'probation', 'inbox', 'joins', 'main')
+           'report', 'review', 'probation', 'inbox', 'joins', 'language', 'main')
 
 
 def drop() -> None:

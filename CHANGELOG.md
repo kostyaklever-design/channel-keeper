@@ -2,6 +2,60 @@
 
 Newest first. Version format: MAJOR.MINOR.PATCH.
 
+## [2.0.2] — 2026-11-01
+### Added — documentation in Russian
+- Every page in `docs/` now has a Russian twin (`AI.ru.md`, `COMMANDS.ru.md`, `CONFIG.ru.md`, `INBOX.ru.md`, `MODERATION.ru.md`, `POSTS.ru.md`, `PRIVACY.ru.md`, `SETTINGS.ru.md`, `SOURCES.ru.md`), with the buttons named as the Russian bot shows them. Each page links to its pair; the Russian README lists the Russian pages.
+- A guard: every English page must have its Russian pair with the same number of sections, and every link and heading anchor on every page must exist.
+### Fixed
+- A few stale lines: «needs AI_API_KEY» (a key added in Telegram works too), «the default English settings» after a one-click deploy, and the owners' verdicts that the learning filter already uses.
+
+## [2.0.1] — 2026-11-01
+### Fixed — documentation
+- SETTINGS, POSTS, AI, SOURCES no longer say the defaults are English: the ad label, «Read on …», the AI retelling language and the chat texts follow the bot's language. PRIVACY lists the stored language.
+
+## [2.0.0] — 2026-11-01
+The bot in Russian, part 4 of 4: Channel Keeper speaks English and Russian.
+### Added
+- What the chat and the channel read by default follows the bot's language too: the warning, ban, flood, first-minutes and probation texts, the captcha text and its «I'm human» button, the «Advertisement» label, «Read on …» under news, and the language of AI retellings. Your own values in `keeper.yaml` stay exactly as written.
+- `language: auto | en | ru` in `keeper.yaml` (default auto); `examples/keeper.ru.yaml` sets `ru`.
+- A guard: every text the bot sends through reply / send / answer / edit / notify must go through `tr()` — an English literal there fails the tests.
+- Both READMEs say the bot is bilingual; the Russian README names the buttons as the Russian bot shows them.
+### Checked
+- The whole test suite was also run with every text forced to Russian: no text breaks (no missing or mismatched placeholders), only the English wording differs.
+
+## [1.12.0] — 2026-11-01
+The bot in Russian, part 3 of 4.
+### Added
+- In Russian now: moderation notices to the owners and the reasons in `/log` (link, spam word, flood, probation, profile), `/ban`, `/unban`, `/forget`, `/id`, Unban / Clear warning, reviews (Delete / Keep) and the learning filter, `/report`, `/sources` and feed errors, the AI (`/ai`, editing, retelling, its errors, the second opinion's «why»), and why a post could not be published.
+- A person pressing a captcha or join-request button reads the answer in their own Telegram language, whatever the owners' language is; a newcomer asked in a private chat before joining gets their own language too.
+### Changed
+- Whether a failed post is the channel's problem (rights, no channel) is no longer told by the English words of the reason, so it works in any language.
+
+## [1.11.0] — 2026-11-01
+The bot in Russian, part 2 of 4.
+### Added
+- In Russian now: posts from the private chat (preview, pin, auto-delete, buttons, times, albums, timers), drafts (comments, expiry, `/drafts`), the queue and the channel rules (`/queue`, held and skipped posts, why a post waits), and the inbox (messages and suggested posts, Reply / Approve / Decline).
+
+## [1.10.0] — 2026-11-01
+The bot in Russian, part 1 of 4.
+### Added
+- The bot's own texts can be Russian. The language follows the owner's Telegram (Russian → Russian, anything else → English); `/lang ru`, `/lang en`, `/lang auto` change it; `language:` in `keeper.yaml` wins over both.
+- The «Menu» button is set by the bot itself at start — no @BotFather step: the default menu in the owners' language and a Russian one for Russian-language Telegram. `/lang` is in it.
+- In Russian already: `/setup` and the AI key, every button under post previews and drafts, the draft headers and outcomes, notifications and `/log` titles.
+- `bot/i18n.py` + `bot/texts_ru.py`: the English text in the code is the key. A test fails when a text has no Russian line, when the Russian line uses other `{placeholders}`, or when a Russian line is left for a text the code no longer says.
+
+## [1.9.6] — 2026-11-01
+### Added
+- **Deploy on Railway** in one click: a published Railway template (`railway.com/deploy/channel-keeper`) — paste the bot token, Railway creates the project and the `/data` volume. The button is in both READMEs and both install guides.
+- The icon (`docs/icon.svg`, `docs/logo.png`) at the top of both READMEs.
+
+## [1.9.5] — 2026-11-01
+### Added
+- The AI key can be added in Telegram: `/setup` ends with **🔑 Add AI key** (also `/ai key`). The bot deletes the message with the key at once, checks the key with one tiny request, and answers ✅ with the provider and model — or the provider's own words, and saves nothing. `/ai off` removes the key. `AI_API_KEY` in the server variables still wins.
+- A key pasted into the private chat by mistake is deleted instead of becoming a post preview.
+### Changed
+- Russian README: buttons are named as the bot shows them (Publish now, Delete / Keep, Reply / Approve / Decline, ✨ Edit with AI).
+
 ## [1.9.4] — 2026-11-01
 ### Changed
 - README screenshots: the AI's «Looks like spam» card with Delete / Keep added next to the captcha; the `/log` screenshot removed (hard to read). Member's name and id blurred.

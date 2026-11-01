@@ -12,6 +12,7 @@ import time
 from telegram import ChatPermissions, Update
 from telegram.ext import ContextTypes
 
+from .i18n import of_code, tr
 from .runtime import cfg, is_admin, log, markup, same_thread, settings, state
 from .runtime import name_of as _name
 
@@ -84,7 +85,7 @@ async def challenge(ctx, user, reason: str, msg=None) -> bool:
 
 async def _send_button(ctx, c, user, msg):
     return await ctx.bot.send_message(cfg.group_id, c.html(user.id, _name(user)), parse_mode='HTML', **same_thread(msg),
-                                   reply_markup=markup([(f'✅ {c.button}', button_data(user.id))]))
+                                   reply_markup=markup([(f'✅ {c.label()}', button_data(user.id))]))
 
 
 async def on_join(ctx, members) -> None:
@@ -118,24 +119,25 @@ async def _delete(ctx, message_id) -> None:
 
 async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE, user_id: int) -> None:
     q = update.callback_query
+    lang = of_code(getattr(q.from_user, 'language_code', None))       # the person pressing, not the owners
     if q.from_user.id != user_id:
-        await q.answer('This button is for someone else.', show_alert=True)
+        await q.answer(tr('This button is for someone else.', lang), show_alert=True)
         return
     taken = state.captcha_take(user_id)
     if taken is None:
-        await q.answer('Already done.')
+        await q.answer(tr('Already done.', lang))
         return
     state.mark_human(user_id)
     # A person, not yet «known»: known comes from the first clean message, after the newcomer checks
     # (profile, learning filter, AI). 1.9.3: marking known here let everyone who pressed skip all three.
     if not await release(ctx, user_id):
         from .runtime import notify_admins
-        await notify_admins(ctx, f'⚠️ {taken[2] or user_id} pressed «I\'m human», but the bot could not give their '
-                                 f'rights back — lift the restriction in the group by hand (id {user_id}).')
-        await q.answer('Thanks! The admins will let you write shortly.')
+        await notify_admins(ctx, tr("⚠️ {name} pressed «I'm human», but the bot could not give their rights back — "
+                                    'lift the restriction in the group by hand (id {id}).', name=taken[2] or user_id, id=user_id))
+        await q.answer(tr('Thanks! The admins will let you write shortly.', lang))
         await _delete(ctx, taken[0])
         return
-    await q.answer('Thanks! You can write now.')
+    await q.answer(tr('Thanks! You can write now.', lang))
     await _delete(ctx, taken[0])
     log.info('captcha passed by %s', user_id)
 
@@ -157,5 +159,5 @@ async def captcha_tick(ctx: ContextTypes.DEFAULT_TYPE) -> None:
             log.error('captcha: cannot remove %s (%s) — lifting the restriction instead', user_id, e)
             await release(ctx, user_id)
         await _delete(ctx, message_id)
-        state.log_action('captcha_kicked', user_id, name, 'joined' if reason == 'join' else 'first message')
+        state.log_action('captcha_kicked', user_id, name, tr('joined') if reason == 'join' else tr('first message'))
         log.info('captcha: removed %s, no press in time', user_id)

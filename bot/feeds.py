@@ -15,6 +15,7 @@ from telegram.ext import ContextTypes
 
 from . import sources as S
 from .draft_flow import send_previews
+from .i18n import tr
 from .runtime import NO_PREVIEW, current, is_admin, log, settings, state
 from .channel_queue import item_post
 from .schedule import CAPTION_LIMIT, TEXT_LIMIT
@@ -34,11 +35,12 @@ async def fetch(url: str) -> bytes:
         async with httpx.AsyncClient(timeout=20, follow_redirects=True, headers=HEADERS) as client:
             r = await client.get(url)
     except httpx.HTTPError as e:
-        raise FeedError(f'cannot reach the feed: {e.__class__.__name__}') from e
+        raise FeedError(tr('cannot reach the feed: {error}', error=e.__class__.__name__)) from e
     if r.status_code != 200:
-        raise FeedError(f'the feed answered {r.status_code}' + (' — check the address' if r.status_code == 404 else ''))
+        raise FeedError(tr('the feed answered {code} — check the address', code=r.status_code) if r.status_code == 404
+                        else tr('the feed answered {code}', code=r.status_code))
     if len(r.content) > MAX_BYTES:
-        raise FeedError('the feed is larger than 5 MB')
+        raise FeedError(tr('the feed is larger than 5 MB'))
     return r.content
 
 
@@ -46,7 +48,7 @@ def read_feed(data: bytes, source: S.Source) -> list[S.Entry]:
     parsed = feedparser.parse(data)
     found = S.entries(parsed, source)
     if not found and parsed.get('bozo'):
-        raise FeedError('this address is not an RSS or Atom feed')
+        raise FeedError(tr('this address is not an RSS or Atom feed'))
     return found
 
 
@@ -57,11 +59,11 @@ def _day_start(now: datetime) -> float:
 
 async def bring_in(ctx, source: S.Source, entry: S.Entry) -> None:
     limit = CAPTION_LIMIT if entry.image else TEXT_LIMIT
-    text = S.render(source, entry, settings().read_more)
+    text = S.render(source, entry, settings().read_more_text())
     if len(text) > limit:
         # Too long (a long custom template): shorten the title, never cut through the HTML of the link.
         cut = max(20, len(entry.title) - (len(text) - limit) - 1)
-        text = S.render(source, dataclasses.replace(entry, title=entry.title[:cut] + '…'), settings().read_more)
+        text = S.render(source, dataclasses.replace(entry, title=entry.title[:cut] + '…'), settings().read_more_text())
     pid = entry.post_id(source.id)
     status = 'draft' if source.mode == 'draft' else 'queued'
     item_id = state.item_add(pid, source.id, source.name, source.label, text, status, html=True, image=entry.image,
@@ -124,22 +126,24 @@ async def poll(ctx: ContextTypes.DEFAULT_TYPE) -> None:
 def sources_text(now: datetime | None = None) -> str:
     srcs = current['sources']
     if not srcs:
-        return 'No sources. Add them to sources.yaml — see docs/SOURCES.md.'
+        return tr('No sources. Add them to sources.yaml — see docs/SOURCES.md.')
     zone = settings().tz
     fmt = lambda ts: datetime.fromtimestamp(ts, timezone.utc).astimezone(zone).strftime('%d.%m %H:%M')
-    out = [f'Sources: {len(srcs)}, checked every {POLL_SECONDS // 60} min']
+    out = [tr('Sources: {n}, checked every {m} min', n=len(srcs), m=POLL_SECONDS // 60)]
     for s in srcs:
         f = state.feed(s.id)
-        out.append(f'\n• {s.name} — {s.type}, {s.label}, {s.mode}')
+        out.append(f'\n• {s.name} — {s.type}, ' + (tr('news') if s.label == 'news' else tr('own')) + ', '
+                   + (tr('draft') if s.mode == 'draft' else tr('auto')))
         if f is None or not f.checked:
-            out.append('  waiting for the first check')
+            out.append('  ' + tr('waiting for the first check'))
         elif f.error:
-            last = f'; last good {fmt(f.ok)}' if f.ok else ''
+            last = '; ' + tr('last good {at}', at=fmt(f.ok)) if f.ok else ''
             out.append(f'  ⚠️ {fmt(f.checked)}: {f.error}{last}')
         elif f.signature != s.signature:
-            out.append(f'  checked {fmt(f.checked)}, getting ready')
+            out.append('  ' + tr('checked {at}, getting ready', at=fmt(f.checked)))
         else:
-            out.append(f'  ✓ {fmt(f.checked)} · brought in {f.found} · skipped {f.skipped}')
+            out.append('  ' + tr('✓ {at} · brought in {found} · skipped {skipped}', at=fmt(f.checked), found=f.found,
+                                  skipped=f.skipped))
     return '\n'.join(out)
 
 

@@ -15,6 +15,7 @@ from telegram.ext import ContextTypes
 
 from .dm_rules import (AD, CANCEL, DELETE, DELETE_CYCLE, EDIT, LINKS, NOW, PICK, PIN, PIN_CYCLE, buttons, hours_label,
                        next_in, parse_links, parse_when, quick_time, scheduled_buttons, too_long, with_label)
+from .i18n import tr
 from .runtime import (ALBUMS, FAILED, ai, cfg, end_wait, failed, log, markup, notify_admins, publish, send_post,
                       settings, state, under, wait_for, waited, why_failed)
 from .schedule import GRACE, Post
@@ -26,7 +27,7 @@ def as_post(p) -> Post:
     links = tuple(tuple(x) for x in json.loads(p.links)) if p.links else ()
     media = tuple(tuple(x) for x in json.loads(p.media)) if p.media else ()
     return Post(f'dm:{p.id}', datetime.fromtimestamp(p.at or p.created, timezone.utc),
-                with_label(p.text, settings().ad_label, bool(p.ad)), photo_id=p.photo_id, html=True, links=links,
+                with_label(p.text, settings().ad_text(), bool(p.ad)), photo_id=p.photo_id, html=True, links=links,
                 media=media)
 
 
@@ -64,7 +65,7 @@ async def on_new_post(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     elif msg.text:
         text, length = msg.text_html, len(msg.text)
     else:
-        await msg.reply_text('A post is text, a photo, a video, a GIF, or an album of photos and videos.')
+        await msg.reply_text(tr('A post is text, a photo, a video, a GIF, or an album of photos and videos.'))
         return
     problem = too_long(length, bool(item))
     if problem:
@@ -97,7 +98,7 @@ async def _collect(ctx, msg, owner_id: int, item) -> None:
     first = gid not in albums
     album = albums.setdefault(gid, {'owner': owner_id, 'items': [], 'caption': '', 'length': 0})
     if item[0] == 'animation':
-        album['bad'] = 'GIFs cannot be in an album — send the GIF on its own.'
+        album['bad'] = tr('GIFs cannot be in an album — send the GIF on its own.')
     album['items'].append(item)
     if msg.caption:
         album['caption'], album['length'] = msg.caption_html, len(msg.caption)
@@ -110,7 +111,7 @@ async def _album_done(ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if not album:
         return
     owner_id = album['owner']
-    problem = album.get('bad') or (f'Up to {ALBUM_MAX} photos and videos in an album.'
+    problem = album.get('bad') or (tr('Up to {n} photos and videos in an album.', n=ALBUM_MAX)
                                    if len(album['items']) > ALBUM_MAX else too_long(album['length'], True))
     if problem:
         await ctx.bot.send_message(owner_id, problem)
@@ -119,10 +120,10 @@ async def _album_done(ctx: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def offer(ctx, owner_id: int, text_html: str, photo: str | None = None,
-                note: str = '👀 Preview — exactly how it will look in the channel:', media: str = '') -> int:
+                note: str | None = None, media: str = '') -> int:
     """A post waiting in the owner's private chat: preview + buttons. Nothing goes out without a press."""
     pid = state.dm_add(owner_id, text_html, photo, media)
-    await ctx.bot.send_message(owner_id, note)
+    await ctx.bot.send_message(owner_id, note or tr('👀 Preview — exactly how it will look in the channel:'))
     await _show(ctx, state.dm(pid))
     return pid
 
@@ -142,7 +143,7 @@ async def _refresh(ctx, post_id: int, what: str) -> None:
             await ctx.bot.edit_message_reply_markup(chat_id=p.admin_id, message_id=p.preview_id, reply_markup=None)
         except Exception:
             pass
-    await ctx.bot.send_message(p.admin_id, f'{what} — the updated preview:')
+    await ctx.bot.send_message(p.admin_id, tr('{what} — the updated preview:', what=what))
     await _show(ctx, p)
 
 
@@ -163,15 +164,15 @@ async def _after_publish(ctx, p, message_id: int) -> None:
     if p.pin_hours:
         try:
             await ctx.bot.pin_chat_message(cfg.channel_id, message_id, disable_notification=True)
-            notes.append(f'📌 pinned ({hours_label(p.pin_hours)})')
+            notes.append(tr('📌 pinned ({hours})', hours=hours_label(p.pin_hours)))
             if p.pin_hours > 0:
                 state.timer_add(message_id, 'unpin', time.time() + p.pin_hours * 3600, f'dm:{p.id}')
         except Exception as e:
-            notes.append(f'⚠️ not pinned: the bot needs «Edit messages» in the channel ({e})')
+            notes.append(tr('⚠️ not pinned: the bot needs «Edit messages» in the channel ({error})', error=e))
     if p.delete_hours:
         for part in ALBUMS.pop(message_id, [message_id]):          # an album: every photo goes
             state.timer_add(part, 'delete', time.time() + p.delete_hours * 3600, f'dm:{p.id}')
-        notes.append(f'⏱ goes away in {p.delete_hours} h (the bot needs «Delete messages» in the channel for that)')
+        notes.append(tr('⏱ goes away in {n} h (the bot needs «Delete messages» in the channel for that)', n=p.delete_hours))
     if notes:
         await ctx.bot.send_message(p.admin_id, ' · '.join(notes), disable_notification=True)
 
@@ -189,66 +190,70 @@ async def timers_tick(ctx: ContextTypes.DEFAULT_TYPE) -> None:
             log.info('%s %s (post %s)', action, message_id, post_id)
         except Exception as e:
             log.warning('could not %s post %s: %s', action, post_id, e)
-            await notify_admins(ctx, f'⚠️ Could not {action} post {post_id} in the channel: {e}. '
-                                     f'Check the bot\'s rights there (Edit / Delete messages).')
+            text = (tr('⚠️ Could not unpin post {id} in the channel: {error}.', id=post_id, error=e) if action == 'unpin'
+                    else tr('⚠️ Could not delete post {id} in the channel: {error}.', id=post_id, error=e))
+            await notify_admins(ctx, text + ' ' + tr("Check the bot's rights there (Edit / Delete messages)."))
 
 
 async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE, action: str, post_id: int) -> None:
     q = update.callback_query
     if not owner(q.from_user.id):
-        await q.answer('Only the channel owners can do this.', show_alert=True)
+        await q.answer(tr('Only the channel owners can do this.'), show_alert=True)
         return
     p = state.dm(post_id)
     if p is None or p.status in ('published', 'cancelled', 'publishing'):
-        await q.answer('Already done.')
+        await q.answer(tr('Already done.'))
         return
     now = datetime.now(settings().tz)
     if action == NOW:
-        await q.answer('Publishing…')
+        await q.answer(tr('Publishing…'))
         if await _publish(ctx, p):
-            await _under(ctx, state.dm(post_id), '✅ Published.')
+            await _under(ctx, state.dm(post_id), tr('✅ Published.'))
         else:
-            await ctx.bot.send_message(q.from_user.id, f'Could not publish: {why_failed(f"dm:{post_id}")}. The post is still here.')
+            await ctx.bot.send_message(q.from_user.id, tr('Could not publish: {why}. The post is still here.',
+                                                          why=why_failed(f'dm:{post_id}')))
     elif action == CANCEL:
         state.dm_move(post_id, 'cancelled', ('new', 'scheduled', 'missed'))
         await q.answer()
-        await _under(ctx, p, '🗑 Cancelled — nothing goes to the channel.')
+        await _under(ctx, p, tr('🗑 Cancelled — nothing goes to the channel.'))
     elif action == LINKS and is_album(p):
-        await q.answer('Telegram does not allow buttons under an album. Send one photo or video for a post with buttons.',
+        await q.answer(tr('Telegram does not allow buttons under an album. Send one photo or video for a post with buttons.'),
                        show_alert=True)
     elif action == LINKS:
         wait_for(ctx, q.from_user.id, 'links', post_id)
         await q.answer()
-        await ctx.bot.send_message(q.from_user.id, 'Buttons under the post, one per line (up to 3):\n'
-                                                   'Buy now - https://example.com/shop\nSend «-» to remove them.',
-                                   reply_markup=ForceReply(selective=True, input_field_placeholder='Text - https://…'))
+        await ctx.bot.send_message(q.from_user.id, tr('Buttons under the post, one per line (up to 3):\n'
+                                                      'Buy now - https://example.com/shop\nSend «-» to remove them.'),
+                                   reply_markup=ForceReply(selective=True, input_field_placeholder=tr('Text - https://…')))
     elif action in (PIN, DELETE):
         field, cycle = ('pin_hours', PIN_CYCLE) if action == PIN else ('delete_hours', DELETE_CYCLE)
         value = next_in(cycle, getattr(p, field))
         state.dm_set(post_id, **{field: value})
-        await q.answer(f'{"Pin" if action == PIN else "Delete"}: {hours_label(value)}')
-        await _refresh(ctx, post_id, f'{"📌 Pin" if action == PIN else "⏱ Delete"}: {hours_label(value)}')
+        label = (tr('📌 Pin: {hours}', hours=hours_label(value)) if action == PIN
+                 else tr('⏱ Delete: {hours}', hours=hours_label(value)))
+        await q.answer(label)
+        await _refresh(ctx, post_id, label)
     elif action == AD:
         on = not p.ad
-        body = re.sub('<[^>]+>', '', with_label(p.text, settings().ad_label, on))
+        body = re.sub('<[^>]+>', '', with_label(p.text, settings().ad_text(), on))
         problem = too_long(len(body), bool(p.photo_id or p.media)) if on else None
         if problem:
             await q.answer(problem, show_alert=True)
             return
         state.dm_set(post_id, ad=int(on))
         await q.answer()
-        await _refresh(ctx, post_id, f'📣 Ad label {"on" if on else "off"}')
+        await _refresh(ctx, post_id, tr('📣 Ad label: {state}', state=tr('on') if on else tr('off')))
     elif action == EDIT:
         wait_for(ctx, q.from_user.id, 'ai_edit', post_id)
         await q.answer()
-        await ctx.bot.send_message(q.from_user.id, 'What should the AI change? For example: shorter, add a question '
-                                                   'at the end, in Dutch.',
-                                   reply_markup=ForceReply(selective=True, input_field_placeholder='shorter'))
+        await ctx.bot.send_message(q.from_user.id, tr('What should the AI change? For example: shorter, add a question '
+                                                      'at the end, in Dutch.'),
+                                   reply_markup=ForceReply(selective=True, input_field_placeholder=tr('shorter')))
     elif action == PICK:
         wait_for(ctx, q.from_user.id, 'time', post_id)
         await q.answer()
-        await ctx.bot.send_message(q.from_user.id, f'When? For example 18:30 or {now + timedelta(days=1):%d.%m} 09:00 '
-                                                   f'({settings().timezone}).',
+        await ctx.bot.send_message(q.from_user.id, tr('When? For example 18:30 or {day} 09:00 ({zone}).',
+                                                      day=f'{now + timedelta(days=1):%d.%m}', zone=settings().timezone),
                                    reply_markup=ForceReply(selective=True, input_field_placeholder='18:30'))
     else:
         at = quick_time(action, now)
@@ -259,7 +264,7 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE, action: str,
 async def _schedule(ctx, p, at: datetime) -> None:
     if state.dm_move(p.id, 'scheduled', ('new', 'scheduled', 'missed'), at=at.timestamp()):
         log.info('dm post %s scheduled for %s', p.id, at)
-        await _under(ctx, p, f'🗓 Goes out {fmt(at)}. It is in /queue; the buttons above still work.',
+        await _under(ctx, p, tr('🗓 Goes out {at}. It is in /queue; the buttons above still work.', at=fmt(at)),
                      scheduled_buttons(p.id))
 
 
@@ -277,7 +282,7 @@ async def on_links_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     p = state.dm(post_id) if post_id else None
     if p is None or p.status not in ('new', 'scheduled', 'missed'):
         end_wait(ctx, user.id)
-        await msg.reply_text('That post is already done — nothing changed.')
+        await msg.reply_text(tr('That post is already done — nothing changed.'))
         return
     links = parse_links(msg.text or '')
     if isinstance(links, str):
@@ -285,7 +290,7 @@ async def on_links_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
     end_wait(ctx, user.id)
     state.dm_set(post_id, links=json.dumps(links, ensure_ascii=False) if links else '')
-    await _refresh(ctx, post_id, f'🔗 {len(links)} button{"s" if len(links) != 1 else ""}')
+    await _refresh(ctx, post_id, tr('🔗 Buttons: {n}', n=len(links)))
 
 
 def waiting_time(ctx, user_id: int) -> bool:
@@ -298,7 +303,7 @@ async def on_time_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     p = state.dm(post_id) if post_id else None
     if p is None or p.status not in ('new', 'scheduled', 'missed'):
         end_wait(ctx, user.id)
-        await msg.reply_text('That post is already done — nothing changed.')
+        await msg.reply_text(tr('That post is already done — nothing changed.'))
         return
     at = parse_when(msg.text or '', datetime.now(settings().tz))
     if isinstance(at, str):
@@ -317,18 +322,18 @@ async def dm_tick(ctx: ContextTypes.DEFAULT_TYPE) -> None:
             continue
         if now - p.at > GRACE.total_seconds():
             if state.dm_move(p.id, 'missed', ('scheduled',)):
-                why = why_failed(f'dm:{p.id}') if f'dm:{p.id}' in FAILED else 'the bot was offline'
-                await _under(ctx, p, f'⚠️ It was due {fmt(p.at)} and did not go out ({why}). Publish it now?',
+                why = why_failed(f'dm:{p.id}') if f'dm:{p.id}' in FAILED else tr('the bot was offline')
+                await _under(ctx, p, tr('⚠️ It was due {at} and did not go out ({why}). Publish it now?', at=fmt(p.at), why=why),
                              scheduled_buttons(p.id))
             continue
         if await _publish(ctx, p):
-            await _under(ctx, state.dm(p.id), '✅ Published on time.')
-        elif await failed(ctx, f'dm:{p.id}', 'Your scheduled post'):
+            await _under(ctx, state.dm(p.id), tr('✅ Published on time.'))
+        elif await failed(ctx, f'dm:{p.id}', tr('Your scheduled post')):
             if state.dm_move(p.id, 'missed', ('scheduled',)):
-                await _under(ctx, p, f'⚠️ Not published: {why_failed(f"dm:{p.id}")}. Fix it and press Publish now.',
+                await _under(ctx, p, tr('⚠️ Not published: {why}. Fix it and press Publish now.', why=why_failed(f'dm:{p.id}')),
                              scheduled_buttons(p.id))
 
 
 def upcoming(limit: int = 5) -> list[str]:
-    return [f'• {fmt(p.at)} «{re.sub("<[^>]+>", "", p.text)[:40] or "photo"}» (from the private chat)'
+    return [tr('• {at} «{text}» (from the private chat)', at=fmt(p.at), text=re.sub('<[^>]+>', '', p.text)[:40] or tr('photo'))
             for p in state.dm_in('scheduled')[:limit]]

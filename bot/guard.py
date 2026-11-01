@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from telegram import ChatPermissions
 from telegram.ext import ContextTypes
 
+from .i18n import tr
 from .runtime import cfg, log, notify_admins, same_thread, settings, state
 from .notify import action_text
 
@@ -77,7 +78,7 @@ async def too_soon(ctx, msg, user_id: int, name: str) -> bool:
     if (user_id, thread) not in told:
         told.add((user_id, thread))
         await say(ctx, 'first_minutes', user_id, name, msg)
-        state.log_action('first_minutes', user_id, name, f'within {minutes} min of a post',
+        state.log_action('first_minutes', user_id, name, tr('within {n} min of a post', n=minutes),
                          msg.text or msg.caption or '')
     return True
 
@@ -116,7 +117,7 @@ async def flood(ctx, msg, user_id: int, name: str) -> bool:
     except Exception:
         pass
     await say(ctx, 'flood', user_id, name, msg)
-    reason = f'{f.messages} messages in {f.seconds} s — read-only for {f.mute_minutes} min'
+    reason = tr('{n} messages in {s} s — read-only for {m} min', n=f.messages, s=f.seconds, m=f.mute_minutes)
     state.log_action('flood', user_id, name, reason, msg.text or msg.caption or '')
     await notify_admins(ctx, action_text('flood', name, user_id, reason), quiet=True)
     return True

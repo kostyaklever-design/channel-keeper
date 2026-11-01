@@ -1,8 +1,12 @@
+<p align="center"><img src="docs/icon.svg" width="112" alt="Channel Keeper icon: a gold shield with a paper plane"></p>
+
 # Channel Keeper by Voxynx
 
 **The bot that keeps your Telegram channel from turning into a dump.**
 
 A free, self-hosted bot for Telegram channel owners. It keeps the discussion group clean, publishes your posts when you want them out, brings in your videos and the news you pick — and keeps the channel balanced between your own posts and other people's news.
+
+[![Deploy on Railway](https://railway.com/button.svg)](https://railway.com/deploy/channel-keeper)
 
 [Русская версия](README.ru.md) · Version — [VERSION](VERSION) · [Changelog](CHANGELOG.md) · License — [MIT](LICENSE)
 
@@ -35,9 +39,12 @@ A free, self-hosted bot for Telegram channel owners. It keeps the discussion gro
 
 **AI — optional, with your own key**
 - A second opinion on newcomers' first comments, an editor (`/ai 3 posts from <link>`, **✨ Edit with AI**), and news retold in your channel's words.
+- Add the key right in Telegram: `/setup` → **🔑 Add AI key** (the bot deletes your message with it at once).
 - The AI never acts on its own: it never publishes, deletes or bans. A test fails if its code ever gets that access.
 
 Plus: `/report` every Monday, `/log` of everything the bot did, `/forget` to delete a person's data.
+
+**Speaks English and Russian.** The language follows your Telegram; `/lang ru` or `/lang en` changes it. Buttons, reports, prompts and the bot's words in the chat follow it; a newcomer checked before joining reads their own language.
 
 Telegram limitation: a bot cannot see the member list or clean up old members. It acts on new messages only.
 
@@ -55,7 +62,8 @@ Telegram limitation: a bot cannot see the member list or clean up old members. I
 
 1. **Create the bot.** Telegram → **@BotFather** → `/newbot` → a name and a username → copy the **token**. Never share it.
 2. **Run it** — pick one way, step by step in [INSTALL](docs/INSTALL.md):
-   - **Railway** — no server of your own, everything in the browser;
+   - **Railway, one click** — [Deploy on Railway](https://railway.com/deploy/channel-keeper), paste the token, done;
+   - **Railway by hand** — no server of your own, everything in the browser;
    - **Docker** — one `docker run`;
    - **your Linux server** — `sudo bash install.sh`.
 

@@ -74,10 +74,17 @@ class AIConfig:
     key: str = ''
     model: str = ''
     monthly_limit: int = 300          # requests per calendar month; protects the owner's bill
+    custom_model: str = ''            # AI_MODEL as set; empty = the cheapest model of the key's provider
 
     @property
     def on(self) -> bool:
         return bool(self.key)
+
+    def with_key(self, key: str) -> 'AIConfig':
+        """The same limits with a key added in Telegram (/setup): the provider is told by the key."""
+        provider = provider_of(key)
+        return AIConfig(provider, key, self.custom_model or AI_DEFAULT_MODEL[provider], self.monthly_limit,
+                        self.custom_model)
 
     @staticmethod
     def from_env() -> 'AIConfig':
@@ -89,8 +96,9 @@ class AIConfig:
         if key and asked and key.startswith('sk-') and provider_of(key) != asked:
             raise SystemExit(f'AI_API_KEY looks like a {provider_of(key)} key, but AI_PROVIDER is {asked!r}. '
                              f'Delete AI_PROVIDER (the bot tells by the key) or set it to {provider_of(key)!r}.')
-        model = os.getenv('AI_MODEL', '').strip() or AI_DEFAULT_MODEL[provider]
+        custom = os.getenv('AI_MODEL', '').strip()
+        model = custom or AI_DEFAULT_MODEL[provider]
         raw = os.getenv('AI_MONTHLY_LIMIT', '300').strip() or '300'
         if not raw.isdigit() or not 1 <= int(raw) <= 100000:
             raise SystemExit(f'AI_MONTHLY_LIMIT must be a whole number of requests per month, got: {raw!r}')
-        return AIConfig(provider, key, model, int(raw))
+        return AIConfig(provider, key, model, int(raw), custom)

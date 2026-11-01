@@ -85,3 +85,6 @@ learning_filter: true
 # The short link under news from feeds, and the language of AI retellings.
 read_more: "Read on {source} →"
 ai_language: English
+
+# The bot's language: auto = the owners' Telegram (Russian or English), or en / ru. /lang changes it in Telegram.
+language: auto

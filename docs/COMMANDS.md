@@ -1,5 +1,7 @@
 # Bot commands
 
+[Русская версия](COMMANDS.ru.md)
+
 Every command the bot knows is described here. The guard `tests/test_docs.py` checks this list against the code.
 
 ## /ban
@@ -17,6 +19,10 @@ Shows the current chat id and your user id. Handy for `CHANNEL_ID`, `GROUP_ID` a
 ## /version
 Where: anywhere. Who: everyone.
 Shows which version of the bot is running.
+
+## /lang
+Where: a private chat with the bot. Who: owners.
+The bot's language for the owners: `/lang ru`, `/lang en`, or `/lang auto` — the language of your Telegram (the default). `language:` in `keeper.yaml` wins over it. The command menu follows.
 
 ## /log
 Where: a private chat with the bot. Who: admins.
@@ -45,8 +51,9 @@ Where: a private chat with the bot. Who: owners.
 `/forget 123456789` — delete everything the bot keeps about that person or channel. See [PRIVACY](PRIVACY.md).
 
 ## /ai
-Where: a private chat with the bot. Who: owners. Needs `AI_API_KEY` ([AI](AI.md)).
+Where: a private chat with the bot. Who: owners. Needs your AI key ([AI](AI.md)).
 `/ai 3 short posts from https://…`, `/ai a post about our new feature: …`, `/ai what should we post tomorrow?` — the AI writes up to 3 drafts; each comes as a preview with the usual buttons. Nothing goes to the channel until you press.
+`/ai key` — add or replace your AI key (the same as **🔑 Add AI key** in `/setup`); `/ai off` — remove it.
 
 ## /report
 Where: a private chat with the bot. Who: owners.

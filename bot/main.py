@@ -5,15 +5,16 @@ from zoneinfo import ZoneInfo
 
 from telegram import Update
 from telegram.ext import (Application, ApplicationHandlerStop, CallbackQueryHandler, ChatJoinRequestHandler,
-                          ChatMemberHandler, CommandHandler, ContextTypes, MessageHandler, filters)
+                          ChatMemberHandler, CommandHandler, ContextTypes, MessageHandler, TypeHandler, filters)
 
 from . import __version__
-from . import ai_flow, captcha, dm_posts, dm_rules, guard, inbox, joins, probation, report, review, setup
+from . import ai_flow, captcha, dm_posts, dm_rules, guard, inbox, joins, language, probation, report, review, setup
 from . import drafts as D
 from .channel_queue import cmd_queue, on_queue_button, queue_tick
 from .channel_queue import parse_button as parse_queue_button
 from .draft_flow import cmd_drafts, drafts_tick, on_draft_button, on_private_text, waiting_comment
 from .feeds import POLL_SECONDS, cmd_sources, poll
+from .i18n import tr
 from .moderation import spam_reason
 from .notify import FORGIVE, OK, UNBAN, action_text, buttons_for, log_text, parse_button
 from .runtime import (FAILED, GROUP, cfg, configured, current, failed, same_thread, why_failed, is_admin, log, notify_admins, publish, refresh_content, retire_notes,
@@ -121,7 +122,7 @@ async def on_group_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> bo
     from_channel = origin is not None and str(origin.type) == 'channel'
     if actor_id < 0 and s.channel_messages == 'block':
         # A channel cannot press the captcha button, so «block» is the captcha for channels.
-        reason = 'message on behalf of a channel'
+        reason = tr('message on behalf of a channel')
     else:
         reason = spam_reason(msg.text or msg.caption or '', entity_types, s.spam_words, from_channel)
     if not reason:
@@ -132,7 +133,7 @@ async def on_group_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> bo
             if state.known_since(actor_id) is None:
                 why = await probation.profile_problem(ctx, actor_id)
                 if why:
-                    await review.ask_owners(ctx, msg, actor_id, actor_name, f'👤 Newcomer with {why}.', 'profile')
+                    await review.ask_owners(ctx, msg, actor_id, actor_name, tr('👤 Newcomer with {why}.', why=why), 'profile')
                     state.log_action('profile_flag', actor_id, actor_name, why, text)
                     return True              # owners decide; not «known» until then
             if state.known_since(actor_id) is None and await review.learned_check(ctx, msg, actor_id, actor_name):
@@ -142,7 +143,7 @@ async def on_group_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> bo
             state.mark_known(actor_id, probation.counts(text))  # a regular for first minutes and probation
         return False
     if edited:
-        reason = f'{reason} (added by editing)'
+        reason = tr('{reason} (added by editing)', reason=reason)
 
     excerpt = msg.text or msg.caption or ''
     await msg.delete()
@@ -167,7 +168,7 @@ async def on_group_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> bo
     ctx.job_queue.run_once(_delete_later, s.warn_seconds, data=(cfg.group_id, note.message_id))
     state.log_action(kind, actor_id, actor_name, reason, excerpt)
     if kind == 'ban':
-        await retire_notes(ctx, actor_id, '→ banned after a second violation')
+        await retire_notes(ctx, actor_id, tr('→ banned after a second violation'))
     text = action_text(kind, actor_name, actor_id, reason, excerpt)
     for admin, message_id in await notify_admins(ctx, text, buttons_for(kind, actor_id)):
         state.add_note(actor_id, admin, message_id, text)
@@ -199,15 +200,15 @@ async def cmd_ban(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     target = reply_target(msg)
     who = author(target) if target else None
     if who is None:
-        await msg.reply_text('Reply to the spammer\'s message with /ban.')
+        await msg.reply_text(tr("Reply to the spammer's message with /ban."))
         return
     await ban(ctx, who[0])
     state.clear_warnings(who[0])
-    await retire_notes(ctx, who[0], '→ banned by an admin')
+    await retire_notes(ctx, who[0], tr('→ banned by an admin'))
     await target.delete()
     await msg.delete()
     log.info('manual ban %s by %s', who[0], update.effective_user.id)
-    state.log_action('manual_ban', who[0], who[1], 'by /ban',
+    state.log_action('manual_ban', who[0], who[1], tr('by /ban'),
                      target.text or target.caption or '', by_admin=update.effective_user.id)
 
 
@@ -222,13 +223,13 @@ async def cmd_unban(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     elif who:
         uid = who[0]
     else:
-        await msg.reply_text('Use /unban <user or channel id> or reply to a message with /unban.')
+        await msg.reply_text(tr('Use /unban <user or channel id> or reply to a message with /unban.'))
         return
     await unban(ctx, uid)
     state.clear_warnings(uid)
-    await retire_notes(ctx, uid, '→ unbanned by an admin')
-    state.log_action('unban', uid, '', 'by /unban', by_admin=update.effective_user.id)
-    await msg.reply_text(f'{"Channel" if uid < 0 else "User"} {uid} can write again.')
+    await retire_notes(ctx, uid, tr('→ unbanned by an admin'))
+    state.log_action('unban', uid, '', tr('by /unban'), by_admin=update.effective_user.id)
+    await msg.reply_text(tr('Channel {id} can write again.', id=uid) if uid < 0 else tr('User {id} can write again.', id=uid))
 
 
 async def cmd_version(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -239,7 +240,7 @@ async def cmd_version(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 async def cmd_id(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """Setup helper: shows chat id and your user id."""
     msg = update.effective_message
-    await msg.reply_text(f'chat id: {update.effective_chat.id}\nyour user id: {update.effective_user.id}')
+    await msg.reply_text(tr('chat id: {chat}\nyour user id: {user}', chat=update.effective_chat.id, user=update.effective_user.id))
 
 
 LOG_MAX = 100
@@ -315,7 +316,7 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await q.answer()
         return
     if not await is_admin(ctx, q.from_user.id):
-        await q.answer('Only admins can do this.', show_alert=True)
+        await q.answer(tr('Only admins can do this.'), show_alert=True)
         return
     action, uid = parsed
     original = getattr(q.message, 'text', None) or ''   # an «inaccessible» old message has no text
@@ -327,12 +328,12 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if action == UNBAN:
         await unban(ctx, uid)
         state.clear_warnings(uid)
-        state.log_action('unban', uid, state.name_of(uid), 'button', by_admin=q.from_user.id)
-        done = f'✅ Unbanned by {_name(q.from_user)} — they can join again.'
+        state.log_action('unban', uid, state.name_of(uid), tr('button'), by_admin=q.from_user.id)
+        done = tr('✅ Unbanned by {who} — they can join again.', who=_name(q.from_user))
     elif action == FORGIVE:
         state.clear_warnings(uid)
-        state.log_action('forgive', uid, state.name_of(uid), 'button', by_admin=q.from_user.id)
-        done = f'✅ Warning cleared by {_name(q.from_user)}.'
+        state.log_action('forgive', uid, state.name_of(uid), tr('button'), by_admin=q.from_user.id)
+        done = tr('✅ Warning cleared by {who}.', who=_name(q.from_user))
     else:
         done = ''
     for admin, message_id, text in state_notes:
@@ -357,11 +358,12 @@ async def tick(ctx: ContextTypes.DEFAULT_TYPE) -> None:
     for p in skip:
         log.warning('skipped old post %s (was due %s)', p.id, p.at)
         state.mark_sent(p.id, p.label, published=False)
-        await notify_admins(ctx, f'⚠️ «{p.id}» from posts.yaml was due {p.at:%d.%m %H:%M} and did not go out '
-                                 f'({why_failed(p.id) if p.id in FAILED else "the bot was offline"}). It is skipped — '
-                                 f'change its id and time to send it again.', quiet=True)
+        why = why_failed(p.id) if p.id in FAILED else tr('the bot was offline')
+        await notify_admins(ctx, tr('⚠️ «{id}» from posts.yaml was due {at} and did not go out ({why}). It is skipped — '
+                                    'change its id and time to send it again.', id=p.id, at=f'{p.at:%d.%m %H:%M}', why=why),
+                            quiet=True)
     for p in send:
-        if not await publish(ctx, p) and await failed(ctx, p.id, f'«{p.id}» from posts.yaml'):
+        if not await publish(ctx, p) and await failed(ctx, p.id, tr('«{id}» from posts.yaml', id=p.id)):
             state.mark_sent(p.id, p.label, published=False)
     await drafts_tick(ctx)
     await queue_tick(ctx)
@@ -372,6 +374,8 @@ async def tick(ctx: ContextTypes.DEFAULT_TYPE) -> None:
 async def on_private(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """A private message: a draft comment or a time the bot asked for; otherwise a new post."""
     uid = update.effective_user.id
+    if await setup.on_key(update, ctx):          # first: a pasted key must never become a post or a reply
+        return
     if await setup.on_forward(update, ctx):
         return
     if inbox.waiting_reply(ctx, uid, update.effective_message):
@@ -394,7 +398,7 @@ async def cmd_forget(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
     arg = (ctx.args or [''])[0]
     if not arg.lstrip('-').isdigit():
-        await update.effective_message.reply_text('Use /forget 123456789 (a user or channel id — see /log).')
+        await update.effective_message.reply_text(tr('Use /forget 123456789 (a user or channel id — see /log).'))
         return
     uid = int(arg)
     if uid > 0 and state.captcha_open(uid):
@@ -403,8 +407,8 @@ async def cmd_forget(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     review.forget_model()                      # the filter must not keep learning from deleted texts
     ctx.bot_data.get('profiles', {}).pop(uid, None)
     log.info('forget %s by %s: %d records', arg, update.effective_user.id, n)
-    await update.effective_message.reply_text(f'Deleted {n} records about {arg}: warnings, captcha, log lines. '
-                                              f'A ban in Telegram itself stays — use /unban for that.')
+    await update.effective_message.reply_text(tr('Deleted {n} records about {id}: warnings, captcha, log lines. '
+                                                 'A ban in Telegram itself stays — use /unban for that.', n=n, id=arg))
 
 
 async def purge(ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -423,6 +427,7 @@ async def _startup(app: Application) -> None:
     if fixed:
         log.info('after the restart: %d posts were left «publishing» and are put right', fixed)
     await refresh_content()
+    await language.set_menu(app.bot)
 
 
 def build_app() -> Application:
@@ -433,12 +438,14 @@ def build_app() -> Application:
     new = filters.UpdateType.MESSAGE & ~filters.DIRECT_MESSAGES
     # A message in the group that starts with a command («/x buy crypto https://…») is moderated first:
     # without this, command-shaped spam would skip every check. Admins' real commands pass untouched.
+    app.add_handler(TypeHandler(Update, language.remember), group=-2)    # the owners' Telegram language
     app.add_handler(MessageHandler(group & filters.COMMAND & filters.UpdateType.MESSAGE, moderate_command), group=-1)
     app.add_handler(CommandHandler('id', cmd_id, filters=new))
     app.add_handler(CommandHandler('setup', setup.cmd_setup, filters=new))
     app.add_handler(CommandHandler('forget', cmd_forget, filters=filters.ChatType.PRIVATE))
     app.add_handler(CommandHandler('ai', ai_flow.cmd_ai, filters=filters.ChatType.PRIVATE))
     app.add_handler(CommandHandler('report', report.cmd_report, filters=filters.ChatType.PRIVATE))
+    app.add_handler(CommandHandler('lang', language.cmd_lang, filters=filters.ChatType.PRIVATE))
     app.add_handler(ChatMemberHandler(setup.on_my_chat_member, ChatMemberHandler.MY_CHAT_MEMBER))
     app.add_handler(ChatJoinRequestHandler(joins.on_request))
     app.add_handler(CommandHandler('version', cmd_version, filters=new))

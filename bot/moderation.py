@@ -8,6 +8,8 @@ are joined back into a word.
 import re
 import unicodedata
 
+from .i18n import tr
+
 LINK_RE = re.compile(
     r'(https?://|www\.|t\.me/|telegram\.me/|wa\.me/|bit\.ly/'
     r'|\b[\w-]+\.(com|net|org|io|ru|ua|xyz|top|site|online|shop|info|biz|me|cc|link)\b)',
@@ -57,17 +59,17 @@ def spam_reason(text: str, entity_types: list[str], spam_words: tuple[str, ...],
                 forwarded_from_channel: bool) -> str | None:
     """Return why a message is spam, or None if it is fine."""
     if forwarded_from_channel:
-        return 'forward from another channel'
+        return tr('forward from another channel')
     if any(t in LINK_ENTITY_TYPES for t in entity_types):
-        return 'link'
+        return tr('link')
     if text and LINK_RE.search(text):
-        return 'link'
+        return tr('link')
     folded = skeleton(text)
     if SKELETON_LINK_RE.search(folded):
-        return 'disguised link'
+        return tr('disguised link')
     variants = (folded, joined_letters(folded))
     for w in spam_words:
         sw = skeleton(w)
         if sw and any(sw in v for v in variants):
-            return f'spam word "{w}"'
+            return tr('spam word "{word}"', word=w)
     return None

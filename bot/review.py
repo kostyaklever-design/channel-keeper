@@ -6,6 +6,7 @@ import time
 from telegram import Update
 from telegram.ext import ContextTypes
 
+from .i18n import tr
 from . import learn
 from .runtime import cfg, log, markup, settings, state
 
@@ -31,13 +32,13 @@ async def learned_check(ctx, msg, user_id: int, name: str) -> bool:
     p = model().spam_probability(text)
     if p < learn.THRESHOLD:
         return False
-    await ask_owners(ctx, msg, user_id, name, f'🧠 Looks like spam you deleted before ({int(p * 100)}%).', 'learned')
+    await ask_owners(ctx, msg, user_id, name, tr('🧠 Looks like spam you deleted before ({n}%).', n=int(p * 100)), 'learned')
     state.log_action('learned_flag', user_id, name, f'{int(p * 100)}%', text)
     return True
 
 
 def buttons(message_id: int, user_id: int) -> list[tuple[str, str]]:
-    return [('🗑 Delete', f'm:del:{message_id}:{user_id}'), ('✅ Keep', f'm:keep:{message_id}:{user_id}')]
+    return [(tr('🗑 Delete'), f'm:del:{message_id}:{user_id}'), (tr('✅ Keep'), f'm:keep:{message_id}:{user_id}')]
 
 
 def parse_button(data: str) -> tuple[str, int, int] | None:
@@ -52,7 +53,8 @@ async def ask_owners(ctx, msg, user_id: int, name: str, headline: str, source: s
     """The message stays in the chat; owners get it with the two buttons."""
     text = msg.text or msg.caption or ''
     state.review_add(msg.message_id, user_id, text, source)
-    note = f'{headline}\nWho: {name} (id {user_id})\nMessage: {text[:300]}\n\nIt is still in the chat — your call.'
+    note = '\n'.join([headline, tr('Who: {name} (id {id})', name=name, id=user_id), tr('Message: {text}', text=text[:300]),
+                      '', tr('It is still in the chat — your call.')])
     for admin in cfg.admin_ids:
         try:
             await ctx.bot.send_message(admin, note, reply_markup=markup(buttons(msg.message_id, user_id)))
@@ -63,13 +65,13 @@ async def ask_owners(ctx, msg, user_id: int, name: str, headline: str, source: s
 async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE, action: str, message_id: int, user_id: int) -> None:
     q = update.callback_query
     if q.from_user.id not in cfg.admin_ids:
-        await q.answer('Only the owners can do this.', show_alert=True)
+        await q.answer(tr('Only the owners can do this.'), show_alert=True)
         return
     who = f'@{q.from_user.username}' if q.from_user.username else q.from_user.first_name
     first = state.review_decide(message_id, user_id, 'spam' if action == 'del' else 'ok')
     if not first:
         # Another owner already decided (Keep and Delete must not both happen).
-        await q.answer('Already decided by another owner.')
+        await q.answer(tr('Already decided by another owner.'))
         try:
             await q.edit_message_reply_markup(reply_markup=None)
         except Exception:
@@ -79,14 +81,14 @@ async def on_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE, action: str,
     if action == 'del':
         try:
             await ctx.bot.delete_message(cfg.group_id, message_id)
-            outcome = f'🗑 Deleted by {who}.'
+            outcome = tr('🗑 Deleted by {who}.', who=who)
         except Exception:
-            outcome = 'Already gone.'
-        state.log_action('review_deleted', user_id, state.name_of(user_id), 'an owner agreed it is spam',
+            outcome = tr('Already gone.')
+        state.log_action('review_deleted', user_id, state.name_of(user_id), tr('an owner agreed it is spam'),
                          by_admin=q.from_user.id)
     else:
         state.trust(user_id)
-        outcome = f'✅ Kept by {who}; this person is trusted now — no more checks of this kind.'
+        outcome = tr('✅ Kept by {who}; this person is trusted now — no more checks of this kind.', who=who)
     await q.answer()
     try:
         # An old message (48 h+) comes as «inaccessible», without text: then only the outcome is shown.

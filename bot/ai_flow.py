@@ -15,7 +15,8 @@ from telegram.ext import ContextTypes
 from . import ai as A
 from . import review
 from .dm_posts import offer
-from .runtime import ai, cfg, end_wait, log, settings, state, waited
+from .i18n import tr
+from .runtime import ai, cfg, end_wait, log, owner_lang, settings, state, waited
 
 SPAM_THRESHOLD = 0.7
 MIN_LENGTH = 25            # «спасибо», «+», «👍» are not worth a request
@@ -35,13 +36,15 @@ async def second_opinion(ctx, msg, user_id: int, name: str) -> bool:
     text = msg.text or msg.caption or ''
     try:
         # Short timeout: moderation must not stall the chat; a late answer = no second opinion this time.
-        p, why = A.read_spam(await ai.ask(A.SPAM_SYSTEM, A.spam_prompt(text), max_tokens=60, timeout=8))
+        language = 'Russian' if owner_lang() == 'ru' else 'English'
+        p, why = A.read_spam(await ai.ask(A.spam_system(language), A.spam_prompt(text), max_tokens=60, timeout=8))
     except A.AIError as e:
         log.info('ai moderation skipped: %s', e)
         return False
     if p < SPAM_THRESHOLD:
         return False
-    await review.ask_owners(ctx, msg, user_id, name, f'🤖 Looks like spam ({int(p * 100)}%: {why or "no reason given"}).',
+    await review.ask_owners(ctx, msg, user_id, name, tr('🤖 Looks like spam ({n}%: {why}).', n=int(p * 100),
+                                                       why=why or tr('no reason given')),
                             'ai')
     state.log_action('ai_flag', user_id, name, why or f'{int(p * 100)}%', text)
     return True
@@ -54,9 +57,9 @@ async def read_page(url: str) -> str:
                                      headers={'User-Agent': 'ChannelKeeper (Telegram bot)'}) as client:
             r = await client.get(url)
     except httpx.HTTPError as e:
-        raise A.AIError(f'Cannot open the link ({e.__class__.__name__}).') from e
+        raise A.AIError(tr('Cannot open the link ({error}).', error=e.__class__.__name__)) from e
     if r.status_code != 200 or 'html' not in r.headers.get('content-type', 'text/html'):
-        raise A.AIError(f'Cannot read the link (answer {r.status_code}).')
+        raise A.AIError(tr('Cannot read the link (answer {code}).', code=r.status_code))
     return A.page_text(r.text[:2_000_000])
 
 
@@ -66,12 +69,22 @@ async def cmd_ai(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if user.id not in cfg.admin_ids:
         return
     request = ' '.join(ctx.args or []).strip()
+    if request.lower() in ('key', 'off'):
+        from . import setup                       # the key lives with /setup
+        if request.lower() == 'key':
+            await setup.ask_key(ctx, user.id)
+        elif ai.key_from_env:
+            await msg.reply_text(tr('The key is set by AI_API_KEY in the server variables; remove it there.'))
+        else:
+            await msg.reply_text(tr('🗑 The AI key is removed. AI is off.') if setup.remove_key() else tr('There was no key.'))
+        return
     if not request:
-        await msg.reply_text('Tell me what you need, for example:\n/ai 3 short posts from https://example.com/article\n'
-                             '/ai a post about our new feature: …\n/ai what should we post tomorrow?')
+        await msg.reply_text(tr('Tell me what you need, for example:\n/ai 3 short posts from https://example.com/article\n'
+                                '/ai a post about our new feature: …\n/ai what should we post tomorrow?\n\n'
+                                '/ai key — add or replace your AI key; /ai off — remove it.'))
         return
     if not ai.c.on:
-        await msg.reply_text('AI is off. Add AI_API_KEY to the server variables — see docs/AI.md.')
+        await msg.reply_text(tr('AI is off. Add your OpenAI or Anthropic key: /ai key (or /setup → 🔑 Add AI key).'))
         return
     from .channel_queue import queue_text       # what is planned: lets the AI answer «what to post tomorrow?»
     try:
@@ -83,12 +96,12 @@ async def cmd_ai(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
     posts = A.split_posts(answer)
     if not posts:
-        await msg.reply_text('The AI returned nothing usable. Try asking differently.')
+        await msg.reply_text(tr('The AI returned nothing usable. Try asking differently.'))
         return
-    await msg.reply_text(f'✨ {len(posts)} draft{"s" if len(posts) > 1 else ""} below. Nothing goes to the channel '
-                         f'until you press a button; edit them with ✨ or write your own.')
+    await msg.reply_text(tr('✨ Drafts below: {n}. Nothing goes to the channel until you press a button; '
+                            'edit them with ✨ or write your own.', n=len(posts)))
     for text in posts:
-        await offer(ctx, user.id, html.escape(text), note='✨ Draft from the AI:')
+        await offer(ctx, user.id, html.escape(text), note=tr('✨ Draft from the AI:'))
 
 
 def waiting_edit(ctx, user_id: int) -> bool:
@@ -99,13 +112,13 @@ async def on_edit_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """The answer to «What should the AI change?» -> a new preview; the old one stays as it was."""
     msg, user = update.effective_message, update.effective_user
     if not (msg.text or '').strip():
-        await msg.reply_text('Write in words what to change — for example «shorter».')
+        await msg.reply_text(tr('Write in words what to change — for example «shorter».'))
         return
     post_id = waited(ctx, user.id, 'ai_edit')
     end_wait(ctx, user.id)
     p = state.dm(post_id) if post_id else None
     if p is None:
-        await msg.reply_text('That post is gone — nothing changed.')
+        await msg.reply_text(tr('That post is gone — nothing changed.'))
         return
     original = re.sub(r'<[^>]+>', '', p.text)
     try:
@@ -116,11 +129,11 @@ async def on_edit_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         return
     posts = A.split_posts(answer, limit=1)
     if not posts:
-        await msg.reply_text('The AI returned nothing usable.')
+        await msg.reply_text(tr('The AI returned nothing usable.'))
         return
-    old = (' The old version is still scheduled — cancel it with 🗑 under it if you use this one.'
-           if p.status == 'scheduled' else ' The old one is still above.')
-    await offer(ctx, user.id, html.escape(posts[0]), p.photo_id, note=f'✨ New version.{old}', media=p.media)
+    note = (tr('✨ New version. The old version is still scheduled — cancel it with 🗑 under it if you use this one.')
+            if p.status == 'scheduled' else tr('✨ New version. The old one is still above.'))
+    await offer(ctx, user.id, html.escape(posts[0]), p.photo_id, note=note, media=p.media)
 
 
 # ---------- retelling a news item from a feed ----------
@@ -132,15 +145,15 @@ async def on_retell(update: Update, ctx: ContextTypes.DEFAULT_TYPE, draft_id: in
     from .sources import read_link
     q = update.callback_query
     if q.from_user.id not in cfg.admin_ids:
-        await q.answer('Only the owners can do this.', show_alert=True)
+        await q.answer(tr('Only the owners can do this.'), show_alert=True)
         return
     d = state.draft(draft_id)
     item = state.item_by_post(d.post_id) if d else None
     if item is None or d.status not in ('pending', 'approved'):
-        await q.answer('This draft is already decided.')
+        await q.answer(tr('This draft is already decided.'))
         return
     if not ai.c.on:
-        await q.answer('AI is off: add AI_API_KEY to the server variables (docs/AI.md).', show_alert=True)
+        await q.answer(tr('AI is off: add your key with /ai key.'), show_alert=True)
         return
     material = item.material
     if not material and item.link and 'news.google.' not in item.link:
@@ -151,16 +164,16 @@ async def on_retell(update: Update, ctx: ContextTypes.DEFAULT_TYPE, draft_id: in
     title = html.unescape(re.sub(r'<[^>]+>', '', item.text.split('\n', 1)[0])).strip()   # stored as HTML: back to plain
     source = item.publisher or item.name
     if material:
-        system, prompt, note = (A.RETELL_SYSTEM.format(language=settings().ai_language),
-                                A.retell_prompt(title, material), '✨ Retold by the AI — the new preview is below.')
+        system, prompt, note = (A.RETELL_SYSTEM.format(language=settings().ai_language_name()),
+                                A.retell_prompt(title, material), tr('✨ Retold by the AI — the new preview is below.'))
     else:
         # Google News gives only a headline: the AI reports it with attribution and adds general context,
         # and is told never to invent details of the event. The owner checks the preview before anything goes out.
-        system, prompt, note = (A.HEADLINE_SYSTEM.format(language=settings().ai_language),
+        system, prompt, note = (A.HEADLINE_SYSTEM.format(language=settings().ai_language_name()),
                                 A.headline_prompt(title, source),
-                                '✨ Written from the headline only (the feed has no article text). Check it before '
-                                'publishing — the new preview is below.')
-    await q.answer('Retelling…')
+                                tr('✨ Written from the headline only (the feed has no article text). Check it before '
+                                   'publishing — the new preview is below.'))
+    await q.answer(tr('Retelling…'))
     try:
         answer = await ai.ask(system, prompt, max_tokens=500)
     except A.AIError as e:
@@ -169,9 +182,9 @@ async def on_retell(update: Update, ctx: ContextTypes.DEFAULT_TYPE, draft_id: in
     retold = (A.split_posts(answer, limit=1) or [''])[0]
     retold = re.sub(r'\n{3,}', '\n\n', retold).strip()
     if not retold:
-        await ctx.bot.send_message(q.from_user.id, 'The AI returned nothing usable — the draft is unchanged.')
+        await ctx.bot.send_message(q.from_user.id, tr('The AI returned nothing usable — the draft is unchanged.'))
         return
-    read = read_link(item.link, source, settings().read_more)
+    read = read_link(item.link, source, settings().read_more_text())
     limit = 1024 if item.image else 4096
     room = limit - len(title) - len(re.sub(r'<[^>]+>', '', read)) - len(d.comment or '') - 8
     text = f'<b>{html.escape(title, quote=False)}</b>\n\n{html.escape(retold[:max(room, 100)], quote=False)}\n\n{read}'

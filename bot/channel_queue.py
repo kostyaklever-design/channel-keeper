@@ -11,6 +11,7 @@ from telegram.ext import ContextTypes
 from . import dm_posts
 from . import drafts as D
 from .hygiene import RATIO, blocker
+from .i18n import tr
 from .runtime import current, failed, is_admin, log, markup, under, name_of, notify_admins, publish, settings, state, why_failed
 from .schedule import Post
 from .state import Item
@@ -39,7 +40,7 @@ def why_not_now(label: str, from_queue: bool = True, now: datetime | None = None
 
 
 def buttons(item_id: int) -> list[tuple[str, str]]:
-    return [('✅ Publish anyway', f'q:{ANYWAY}:{item_id}'), ('🗑 Skip', f'q:{SKIP}:{item_id}')]
+    return [(tr('✅ Publish anyway'), f'q:{ANYWAY}:{item_id}'), (tr('🗑 Skip'), f'q:{SKIP}:{item_id}')]
 
 
 def parse_button(data: str) -> tuple[str, int] | None:
@@ -60,7 +61,7 @@ async def _retire(ctx, item_id: int, text: str) -> None:
 
 async def tell_held(ctx, item: Item, reason: str, to: list[int] | None = None) -> None:
     """Admins learn once that a post is waiting, and may push it out anyway."""
-    text = f'⏸ «{item.name}» waits in the queue: {reason}.\n\n{item.text[:300]}'
+    text = tr('⏸ «{name}» waits in the queue: {why}.', name=item.name, why=reason) + f'\n\n{item.text[:300]}'
     if to is None:
         sent = await notify_admins(ctx, text, buttons(item.id), quiet=True)
     else:
@@ -99,13 +100,13 @@ async def queue_tick(ctx: ContextTypes.DEFAULT_TYPE) -> None:
                 if draft:
                     state.draft_move(draft.id, 'expired', ('approved',))
                 log.info('queued news %s expired after 72 h', item.post_id)
-                await _retire(ctx, item.id, '⌛ Left the queue: older than 72 hours.')
+                await _retire(ctx, item.id, tr('⌛ Left the queue: older than 72 hours.'))
     for item in state.items_in('queued'):
         why = why_not_now(item.label, now=now)
         if why is None:
             if await publish_item(ctx, item):
-                await _retire(ctx, item.id, '✅ Went out on its own — the rules allowed it.')
-            elif await failed(ctx, item.post_id, f'«{item.name}» from the queue'):
+                await _retire(ctx, item.id, tr('✅ Went out on its own — the rules allowed it.'))
+            elif await failed(ctx, item.post_id, tr('«{name}» from the queue', name=item.name)):
                 # Set aside so the posts behind it are not blocked forever.
                 state.item_move(item.id, 'failed', ('queued',))
                 draft = state.draft_for(item.post_id)
@@ -122,11 +123,11 @@ async def queue_tick(ctx: ContextTypes.DEFAULT_TYPE) -> None:
 async def on_queue_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE, action: str, item_id: int) -> None:
     q = update.callback_query
     if not await is_admin(ctx, q.from_user.id):
-        await q.answer('Only admins can do this.', show_alert=True)
+        await q.answer(tr('Only admins can do this.'), show_alert=True)
         return
     item = state.item(item_id)
     if item is None or item.status != 'queued':
-        await q.answer('Already decided.')
+        await q.answer(tr('Already decided.'))
         try:
             await q.edit_message_reply_markup(reply_markup=None)
         except Exception:
@@ -134,22 +135,23 @@ async def on_queue_button(update: Update, ctx: ContextTypes.DEFAULT_TYPE, action
         return
     who = name_of(q.from_user)
     if action == ANYWAY:
-        await q.answer('Publishing…')
+        await q.answer(tr('Publishing…'))
         if not await publish_item(ctx, item):
-            await ctx.bot.send_message(q.from_user.id, f'Could not publish «{item.name}»: {why_failed(item.post_id)}. It stays in the queue.')
+            await ctx.bot.send_message(q.from_user.id, tr('Could not publish «{id}»: {why}. It stays in the queue.',
+                                                          id=item.name, why=why_failed(item.post_id)))
             return
         state.log_action('queue_forced', reason=item.post_id, by_admin=q.from_user.id)
-        await _retire(ctx, item.id, f'✅ Published anyway by {who}.')
+        await _retire(ctx, item.id, tr('✅ Published anyway by {who}.', who=who))
     else:
         if not state.item_move(item.id, 'skipped', ('queued',)):
-            await q.answer('Already decided.')
+            await q.answer(tr('Already decided.'))
             return
         draft = state.draft_for(item.post_id)
         if draft:
             state.draft_move(draft.id, 'rejected', ('approved',), by=q.from_user.id)
         state.log_action('queue_skipped', reason=item.post_id, by_admin=q.from_user.id)
         await q.answer()
-        await _retire(ctx, item.id, f'🗑 Skipped by {who}.')
+        await _retire(ctx, item.id, tr('🗑 Skipped by {who}.', who=who))
 
 
 def queue_text(now: datetime | None = None) -> str:
@@ -162,27 +164,29 @@ def queue_text(now: datetime | None = None) -> str:
     for n, item in enumerate(queued, 1):
         why = why_not_now(item.label, now=now)
         if why is None:
-            status = 'next, within a minute' if first_free else 'after the posts above'
+            status = tr('next, within a minute') if first_free else tr('after the posts above')
             first_free = False
         else:
             status = why[1]
-        lines.append(f'{n}. «{item.name}» ({item.label}) — {status}\n   {item.text.splitlines()[0][:80]}')
-    head = f'Queue: {len(queued)}' if queued else 'Queue: empty'
+        label = tr('news') if item.label == 'news' else tr('own')
+        lines.append(f'{n}. «{item.name}» ({label}) — {status}\n   {item.text.splitlines()[0][:80]}')
+    head = tr('Queue: {n}', n=len(queued)) if queued else tr('Queue: empty')
     rules = s.rules
     today = sum(1 for at, _ in state.history() if at.astimezone(s.tz).date() == now.astimezone(s.tz).date())
-    info = [f'Today in the channel: {today}' + (f' of {rules.daily_limit}' if rules.daily_limit else '')]
+    info = [tr('Today in the channel: {n} of {limit}', n=today, limit=rules.daily_limit) if rules.daily_limit
+            else tr('Today in the channel: {n}', n=today)]
     if rules.quiet:
-        info.append(f'Quiet hours: {rules.quiet[0]:%H:%M}–{rules.quiet[1]:%H:%M}')
+        info.append(tr('Quiet hours: {start}–{end}', start=f'{rules.quiet[0]:%H:%M}', end=f'{rules.quiet[1]:%H:%M}'))
     if rules.news_in_a_row:
-        info.append(f'Rule 1 : {rules.news_in_a_row}: at most {rules.news_in_a_row} news in a row')
+        info.append(tr('Rule 1 : {n}: at most {n} news in a row', n=rules.news_in_a_row))
     upcoming = [p for p in current['posts'] if p.at > now and not state.is_sent(p.id)][:5]
-    sched = [f'• {D.when(p, s.timezone)} «{p.id}»' + (' (draft)' if p.status == 'draft' else '') for p in upcoming]
+    sched = [f'• {D.when(p, s.timezone)} «{p.id}»' + (' ' + tr('(draft)') if p.status == 'draft' else '') for p in upcoming]
     out = [head] + lines + [''] + info
     if sched:
-        out += ['', 'Next from posts.yaml:'] + sched
+        out += ['', tr('Next from posts.yaml:')] + sched
     own = dm_posts.upcoming()
     if own:
-        out += ['', 'Scheduled from the private chat:'] + own
+        out += ['', tr('Scheduled from the private chat:')] + own
     return '\n'.join(out)
 
 
