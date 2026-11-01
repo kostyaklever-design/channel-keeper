@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="bg" cx="38%" cy="28%" r="85%">
+      <stop offset="0" stop-color="#232a66"/>
+      <stop offset="0.55" stop-color="#121640"/>
+      <stop offset="1" stop-color="#0a0c26"/>
+    </radialGradient>
+    <linearGradient id="goldL" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff3cf"/>
+      <stop offset="0.45" stop-color="#e8c06e"/>
+      <stop offset="1" stop-color="#a8742c"/>
+    </linearGradient>
+    <linearGradient id="goldR" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d9a957"/>
+      <stop offset="0.6" stop-color="#9c6a26"/>
+      <stop offset="1" stop-color="#6e4615"/>
+    </linearGradient>
+    <linearGradient id="inner" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1b2156"/>
+      <stop offset="1" stop-color="#0c0f2e"/>
+    </linearGradient>
+    <linearGradient id="planeL" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#c8913e"/>
+      <stop offset="1" stop-color="#fff0c4"/>
+    </linearGradient>
+    <linearGradient id="planeR" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#b9842f"/>
+      <stop offset="1" stop-color="#7a4f18"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="14" result="b"/>
+      <feColorMatrix in="b" type="matrix" values="0 0 0 0 0.95  0 0 0 0 0.75  0 0 0 0 0.35  0 0 0 0.35 0"/>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <g filter="url(#glow)">
+    <!-- shield: two facets, light left and shadowed right, like a cut crystal -->
+    <path d="M256 84 L256 440 Q118 378 112 262 L112 128 Z" fill="url(#goldL)"/>
+    <path d="M256 84 L400 128 L400 262 Q394 378 256 440 Z" fill="url(#goldR)"/>
+    <!-- inner field -->
+    <path d="M256 124 L362 156 L362 262 Q357 345 256 394 Q155 345 150 262 L150 156 Z" fill="url(#inner)"/>
+    <!-- paper plane, faceted -->
+    <path d="M166 266 L346 190 L268 286 Z" fill="url(#planeL)"/>
+    <path d="M268 286 L346 190 L304 344 Z" fill="url(#planeR)"/>
+    <path d="M268 286 L261 330 L284 308 Z" fill="#8a5a1e"/>
+  </g>
+  <!-- facet highlight along the ridge -->
+  <path d="M256 84 L256 124" stroke="#fff6dc" stroke-width="3" stroke-linecap="round" opacity="0.8"/>
+</svg>
