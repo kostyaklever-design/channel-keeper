@@ -1,0 +1,4 @@
+python-telegram-bot[job-queue]==22.8
+PyYAML==6.0.2
+httpx==0.28.1
+feedparser==6.0.11

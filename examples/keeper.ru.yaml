@@ -1,0 +1,95 @@
+# Пример настроек для русскоязычного канала. Скопируйте в keeper.yaml в корне репозитория.
+# Channel settings that are not secrets. Optional: without this file the bot uses English defaults.
+# Edit on GitHub (pencil icon) -> Commit. The bot picks up changes within 5 minutes.
+
+timezone: Europe/Amsterdam      # used for posts.yaml times
+
+# Messages with any of these words (case-insensitive, part of a word counts) are removed.
+spam_words:
+  - casino
+  - crypto
+  - airdrop
+  - giveaway
+  - onlyfans
+  - forex
+  - binance
+  - usdt
+  - earn money
+  - make money
+  - dm me
+  - write me in private
+  - заработок
+  - заработать
+  - ставки
+  - казино
+  - криптовалют
+  - крипта
+  - пиши в лс
+  - пишите в лс
+
+warn_seconds: 60                # how long the bot's warning stays in the chat
+
+# What the bot says in the chat. {name} = @username or first name.
+messages:
+  warn: "{name}, ссылки и реклама здесь запрещены. В следующий раз — бан."
+  ban: "{name} удалён за повторный спам."
+  flood: "{name}, слишком много сообщений подряд — писать снова можно через несколько минут."
+  first_minutes: "{name}, новые участники могут комментировать через несколько минут после поста."
+  probation: "{name}, картинки без текста, пересылки и контакты станут доступны после первых сообщений."
+
+# When posts from feeds (sources.yaml) may go out. Posts from posts.yaml are never held, only counted.
+channel_rules:
+  daily_limit: 6                # posts a day in the channel, all kinds; 0 = no limit
+  quiet_hours: "23:00-08:00"    # nothing from the queue at night; off = no quiet hours
+  news_in_a_row: 3              # rule 1 : 3 — the 4th news in a row waits for your own post
+  gap_minutes: 30               # minutes between two posts from the queue; 0 = no gap
+
+# «I'm human» button: everyone except admins presses it once — newcomers on join,
+# old members on their first message. Not pressed in time -> removed (may join again).
+captcha:
+  enabled: true                 # turn off with: false
+  seconds: 120                  # slow connections need time to even see the button
+  text: "{name}, нажмите кнопку в течение {seconds} секунд, чтобы писать в этом чате."
+  button: "Я человек"
+
+# Messages written «on behalf of a channel» (not your own channel) — a common spam trick:
+# a channel cannot press the captcha button. block = deleted (warning, then the channel is banned);
+# check = treated like people: only links, forwards and spam words are removed.
+channel_messages: block
+
+# More than 5 messages in 10 seconds -> read-only for 10 minutes. An album counts as one. off = no limit.
+flood:
+  messages: 5
+  seconds: 10
+  mute_minutes: 10
+
+# The first minutes after a post: only members the bot already knew may comment under it.
+# Turn on (5) after the bot has run for about a week and has seen your regulars.
+first_minutes: 0
+
+# Log lines older than this are deleted (see docs/PRIVACY.md).
+keep_days: 90
+
+# With AI_API_KEY set: the first comment of someone new gets a second opinion; you decide Delete / Keep.
+ai_moderation: true
+
+# Newcomers: pictures without words, forwards, contacts — only after 2 real messages (15+ characters).
+probation:
+  messages: 2
+  min_length: 15
+
+# A link or spam word in a newcomer's profile -> the message stays, owners decide Delete / Keep.
+profile_check: true
+
+# The first line of a post marked as an ad (📣 under the preview in the private chat).
+ad_label: Реклама
+
+# If the group approves new members: captcha in a private chat before they get in (or owners decide, or off).
+join_requests: captcha
+
+# Learns from your Delete / Keep (needs 20 of each first); a look-alike of deleted spam comes to you, never deleted by itself.
+learning_filter: true
+
+# The short link under news from feeds, and the language of AI retellings.
+read_more: "Читать на {source} →"
+ai_language: Russian

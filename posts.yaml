@@ -1,0 +1,23 @@
+# Scheduled posts for the channel. The easiest way to post is to send the post to the bot
+# in a private chat (docs/POSTS.md); this file is for planning many posts at once.
+# Edit on GitHub (pencil icon) -> Commit. The bot picks up changes within 5 minutes.
+#
+# Each post:
+#   id     unique name, never reuse it (the bot remembers which ids it already sent)
+#   at     date and time in the timezone below, format: 2026-11-03 10:00
+#   image  optional, path to a picture, e.g. posts/how-it-works.png
+#   text   the post; with an image max 1024 characters, without max 4096
+#   status optional: draft = admins approve it in a private chat first (see docs/POSTS.md)
+#
+# A post whose time passed more than 30 minutes ago is skipped, not sent late.
+
+timezone: UTC
+
+posts:
+  - id: example-welcome
+    at: 2030-01-01 10:00
+    status: draft
+    text: |
+      Welcome to the channel!
+
+      This is an example post from posts.yaml. Change the date, the text — or delete it.

@@ -1,0 +1,21 @@
+# Every text file is stored and checked out with LF line endings, on every system.
+# Without this Git on Windows converts them to CRLF ("This file uses 'LF' line endings…").
+* text=auto eol=lf
+*.sh text eol=lf
+*.py text eol=lf
+*.md text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.json text eol=lf
+*.txt text eol=lf
+*.ini text eol=lf
+Dockerfile text eol=lf
+LICENSE text eol=lf
+VERSION text eol=lf
+# Pictures and other binary files are never touched.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.zip binary

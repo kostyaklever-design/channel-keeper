@@ -1,0 +1,32 @@
+# Feeds the bot checks every 15 minutes. Full description: docs/SOURCES.md
+# Edit on GitHub (pencil icon) -> Commit. The bot picks up changes within 5 minutes.
+# A Russian-language example: examples/sources.ru.yaml
+#
+# A new feed never dumps old entries: everything already in it is marked as seen.
+# Other people's news always comes to you as a draft — into the channel only after your press.
+# per_day — at most this many drafts a day from that feed.
+#
+# To turn a feed on, delete "# " at the start of each line of its block (keep the two spaces before -).
+
+sources:
+  ## Your YouTube channel: YouTube -> your channel -> About -> Share -> Copy channel ID (starts with UC).
+  # - id: my-youtube
+  #   type: youtube
+  #   channel: UCxxxxxxxxxxxxxxxxxxxxxx
+  #   name: My YouTube
+  #   template: "🎬 New video: {title}\n\n{link}"
+
+  ## Any blog or site with RSS — your own posts go straight to the queue.
+  # - id: my-blog
+  #   type: rss
+  #   url: https://example.com/feed.xml
+  #   name: My blog
+
+  ## News on a topic from Google News, in your language and country.
+  # - id: news
+  #   type: google_news
+  #   query: '"voice AI" OR "AI agents"'
+  #   lang: en
+  #   country: US
+  #   name: Google News · AI
+  #   per_day: 2

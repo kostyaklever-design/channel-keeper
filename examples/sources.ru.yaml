@@ -1,0 +1,44 @@
+# Пример лент для русскоязычного канала про ИИ. Скопируйте в sources.yaml в корне репозитория.
+# Ленты, которые бот проверяет каждые 15 минут. Полное описание: docs/SOURCES.md
+# Правка: GitHub -> карандаш -> Commit. Бот подхватывает изменения за 5 минут.
+#
+# Новая лента никогда не вываливает старое: всё, что в ней уже есть, помечается просмотренным.
+# Чужие новости (label: news) всегда приходят тебе черновиком — в канал только после нажатия.
+# per_day — сколько черновиков в день максимум с этой ленты.
+
+sources:
+  # Хабр, раздел «Искусственный интеллект» — технические статьи на русском, без политики.
+  - id: habr-ai
+    type: rss
+    url: https://habr.com/ru/rss/hubs/artificial_intelligence/articles/?fl=ru
+    label: news
+    mode: draft
+    name: Хабр · ИИ
+    per_day: 2
+
+  # Google News на русском, издание «Украина (русский)» — не российские СМИ.
+  # Если выдача окажется шумной — поменяй country на LV (Латвия) или KZ (Казахстан).
+  - id: news-ru
+    type: google_news
+    query: '"ИИ-агент" OR "ИИ-ассистент" OR "голосовой ИИ" OR "нейросеть для бизнеса"'
+    lang: ru
+    country: UA
+    name: Google News · ИИ
+    per_day: 2
+
+  # Одна английская новость в день — добавь сверху строчку по-русски, что случилось.
+  - id: news-en
+    type: google_news
+    query: '"AI receptionist" OR "voice AI agent"'
+    lang: en
+    country: US
+    name: Google News · AI (EN)
+    per_day: 1
+
+  # Твой YouTube: убери «# » в строках ниже и вставь id канала
+  # (YouTube -> канал -> «О канале» -> «Поделиться» -> «Скопировать идентификатор канала», начинается с UC).
+  # - id: my-youtube
+  #   type: youtube
+  #   channel: UCxxxxxxxxxxxxxxxxxxxxxx
+  #   name: Мой YouTube
+  #   template: "🎬 Новое видео: {title}\n\n{link}"
